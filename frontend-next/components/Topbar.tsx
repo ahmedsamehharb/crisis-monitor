@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, ChevronDown, MapPin, Shield } from "lucide-react";
+import Link from "next/link";
+import { Bell, Settings, Shield } from "lucide-react";
 
 interface Props {
-  gemeinden: string[];
-  gemeinde: string;
-  onGemeinde: (v: string) => void;
   zaehler: { offen: number; hold: number; bewertet: number };
 }
 
@@ -18,10 +16,8 @@ function Zahl({ n, label }: { n: number; label: string }) {
   );
 }
 
-export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Props) {
-  const [open, setOpen] = useState(false);
+export default function Topbar({ zaehler }: Props) {
   const [uhrzeit, setUhrzeit] = useState<string | null>(null);
-  const optionen = ["alle", ...gemeinden];
 
   // Uhr erst nach dem Mount ticken lassen (Hydration)
   useEffect(() => {
@@ -53,58 +49,6 @@ export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Pro
           {uhrzeit ?? "--:--:--"}
         </span>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-haspopup="listbox"
-            aria-expanded={open}
-            aria-label="Standort wählen"
-            className={`flex h-8 items-center gap-1.5 rounded-md border bg-bg px-2.5 text-xs font-medium ${
-              gemeinde !== "alle" ? "border-accent/50 text-accent" : "border-line text-ink"
-            }`}
-          >
-            <MapPin className="h-3.5 w-3.5 text-mute" aria-hidden />
-            {gemeinde === "alle" ? "Alle Gemeinden" : gemeinde}
-            <ChevronDown className="h-3.5 w-3.5 text-mute" aria-hidden />
-          </button>
-          {open && (
-            <>
-              <button
-                type="button"
-                aria-label="Auswahl schließen"
-                className="fixed inset-0 z-40 cursor-default"
-                onClick={() => setOpen(false)}
-                tabIndex={-1}
-              />
-              <ul
-                role="listbox"
-                aria-label="Gemeinde wählen"
-                className="absolute left-0 top-10 z-50 w-52 overflow-hidden rounded-lg border border-line bg-card p-1 shadow-xl shadow-black/40"
-              >
-                {optionen.map((g) => (
-                  <li key={g}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={gemeinde === g}
-                      onClick={() => {
-                        onGemeinde(g);
-                        setOpen(false);
-                      }}
-                      className={`w-full rounded-md px-2.5 py-1.5 text-left text-xs ${
-                        gemeinde === g ? "bg-accent/15 text-accent" : "text-ink hover:bg-white/[0.06]"
-                      }`}
-                    >
-                      {g === "alle" ? "Alle Gemeinden" : g}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-
         <p className="hidden items-center gap-2 text-xs lg:flex" aria-label="Lagezähler">
           <Zahl n={zaehler.offen} label="offen" />
           <span className="text-line">·</span>
@@ -115,6 +59,13 @@ export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Pro
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
+        <Link
+          href="/settings"
+          aria-label="Einstellungen"
+          className="grid h-8 w-8 place-items-center rounded-md border border-line text-mute hover:text-ink"
+        >
+          <Settings className="h-4 w-4" />
+        </Link>
         <button
           type="button"
           aria-label="Benachrichtigungen"

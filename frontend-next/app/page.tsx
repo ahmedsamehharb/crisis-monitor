@@ -7,6 +7,8 @@ import QueueColumn from "@/components/QueueColumn";
 import Topbar from "@/components/Topbar";
 import { INITIAL_EVENTS, MOCK_NOW } from "@/data/events";
 import { fetchEvents } from "@/lib/api";
+import { BW_REGIONS, REGION_RADIUS_KM, haversineKm } from "@/lib/geo";
+import { useFilterSettings } from "@/lib/settings";
 import type { Event as CwEvent, EventStatus } from "@/lib/types";
 import { sortQueue } from "@/lib/ui";
 
@@ -28,7 +30,6 @@ export default function Home() {
   );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<"event" | "alle">("alle");
-  const [gemeinde, setGemeinde] = useState<string>("alle");
   const [sortBy, setSortBy] = useState<"urgency" | "confidence">("urgency");
   const [detailOpen, setDetailOpen] = useState(false);
   // Bezugszeitpunkt: Mock nutzt den festen MOCK_NOW, echte Daten die reale Uhrzeit
@@ -62,27 +63,40 @@ export default function Home() {
     return () => ctrl.abort();
   }, []);
 
-  const gemeinden = useMemo(
-    () => [...new Set(events.map((e) => e.ort.split(",")[0].trim()))],
-    [events]
+  // Filter aus der Einstellungs-Unterseite: mehrere Gegenden (Geolokation +
+  // Umkreis) und mehrere Ereignistypen, jeweils ODER-verknüpft.
+  const [filters] = useFilterSettings();
+
+  const regionCenters = useMemo(
+    () => filters.regions.flatMap((name) => BW_REGIONS.filter((r) => r.name === name)),
+    [filters.regions]
   );
 
-  const inGemeinde = useCallback(
-    (e: CwEvent) => gemeinde === "alle" || e.ort.split(",")[0].trim() === gemeinde,
-    [gemeinde]
+  const matchesFilters = useCallback(
+    (e: CwEvent) => {
+      if (filters.eventTypes.length > 0 && !filters.eventTypes.includes(e.eventType)) return false;
+      if (
+        regionCenters.length > 0 &&
+        !regionCenters.some((c) => haversineKm(c, { lat: e.lat, lon: e.lon }) <= REGION_RADIUS_KM)
+      ) {
+        return false;
+      }
+      return true;
+    },
+    [filters.eventTypes, regionCenters]
   );
 
   const eingang = useMemo(
-    () => sortQueue(events.filter((e) => e.status === "neu").filter(inGemeinde), sortBy),
-    [events, inGemeinde, sortBy]
+    () => sortQueue(events.filter((e) => e.status === "neu").filter(matchesFilters), sortBy),
+    [events, matchesFilters, sortBy]
   );
 
   const onHold = useMemo(
-    () => sortQueue(events.filter((e) => e.status === "hold").filter(inGemeinde), sortBy),
-    [events, inGemeinde, sortBy]
+    () => sortQueue(events.filter((e) => e.status === "hold").filter(matchesFilters), sortBy),
+    [events, matchesFilters, sortBy]
   );
 
-  const mapEvents = useMemo(() => events.filter(inGemeinde), [events, inGemeinde]);
+  const mapEvents = useMemo(() => events.filter(matchesFilters), [events, matchesFilters]);
 
   const archive = useMemo(
     () => events.filter((e) => e.status === "bestaetigt" || e.status === "abgelehnt"),
@@ -152,9 +166,6 @@ export default function Home() {
   return (
     <main className="flex h-dvh flex-col">
       <Topbar
-        gemeinden={gemeinden}
-        gemeinde={gemeinde}
-        onGemeinde={setGemeinde}
         zaehler={{ offen: eingang.length, hold: onHold.length, bewertet: archive.length }}
       />
       <div className="relative grid min-h-0 flex-1 grid-cols-[320px_1fr] xl:grid-cols-[320px_minmax(540px,1fr)_minmax(380px,520px)]">
