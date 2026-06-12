@@ -4,11 +4,12 @@
   "private": true,
   "description": "Real-time crisis monitoring dashboard",
   "scripts": {
-    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend && npm install --prefix frontend-next",
     "stop:backend": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }\"",
     "dev:backend": "npm run dev --prefix backend",
     "restart:backend": "npm run stop:backend && npm run dev:backend",
     "dev:frontend": "npm run dev --prefix frontend",
+    "dev:frontend-next": "npm run dev --prefix frontend-next",
     "start:backend": "npm start --prefix backend"
   }
 }
