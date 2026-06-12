@@ -25,7 +25,7 @@ const DANGER = "#E5484D";
 const WARNING = "#E7B53C";
 const SUCCESS = "#3FB36B";
 
-type Bereich = "eingang" | "hold" | "archiv";
+type Bereich = "pending" | "archiv";
 
 interface RowProps {
   ev: CwEvent;
@@ -54,7 +54,8 @@ function EventRow({
   onHover,
 }: RowProps) {
   const Icon = ev.verdacht ? TriangleAlert : TYPE_ICON[ev.eventType];
-  const hinweis = bereich === "hold" ? holdHinweis(ev) : null;
+  const isHold = ev.status === "hold";
+  const hinweis = isHold ? holdHinweis(ev) : null;
   const kante = ev.verdacht ? DANGER : hinweis ? WARNING : SEV[ev.urgency];
   const stat = quellenStat(ev);
 
@@ -65,7 +66,7 @@ function EventRow({
     }`;
   } else if (ev.verdacht) {
     subzeile = `${ev.verdacht.kernwiderspruch} · ${ev.verdacht.shares.toLocaleString("de-DE")} Shares`;
-  } else if (bereich === "hold") {
+  } else if (isHold) {
     subzeile = `${stat.gesamt} Quellen · ${stat.typen} ${stat.typen === 1 ? "Typ" : "Typen"} · ${fmtVor(
       ev.hold?.seitMin ?? minutenSeit(nowIso, ev.wann)
     )}`;
@@ -135,7 +136,7 @@ function EventRow({
                 viral
               </span>
             </>
-          ) : bereich === "hold" ? (
+          ) : isHold ? (
             <>
               <TrendPfeil richtung={trendRichtung(ev)} />
               <KonfidenzText value={ev.confidence} verified={ev.verifiziert} />
@@ -170,9 +171,9 @@ function SectionHeader({
 }
 
 interface Props {
-  eingang: CwEvent[];
-  onHold: CwEvent[];
+  pending: CwEvent[];
   archive: CwEvent[];
+  pendingLabel: string;
   nowIso: string;
   selectedId: string;
   hoveredId: string | null;
@@ -184,9 +185,9 @@ interface Props {
 }
 
 export default function QueueColumn({
-  eingang,
-  onHold,
+  pending,
   archive,
+  pendingLabel,
   nowIso,
   selectedId,
   hoveredId,
@@ -214,7 +215,7 @@ export default function QueueColumn({
       aria-label="Meldungslisten"
       className="flex h-full min-h-0 flex-col overflow-y-auto border-r border-line bg-panel"
     >
-      <SectionHeader label="Eingang" count={eingang.length}>
+      <SectionHeader label={pendingLabel} count={pending.length}>
         <button
           type="button"
           onClick={() => onSortBy(sortBy === "urgency" ? "confidence" : "urgency")}
@@ -228,21 +229,11 @@ export default function QueueColumn({
         </button>
       </SectionHeader>
       <div>
-        {eingang.map((ev) => (
-          <EventRow key={ev.id} {...rowProps(ev, "eingang")} />
+        {pending.map((ev) => (
+          <EventRow key={ev.id} {...rowProps(ev, "pending")} />
         ))}
-        {eingang.length === 0 && (
-          <p className="px-4 py-4 text-xs text-dim">Keine offenen Meldungen im Eingang.</p>
-        )}
-      </div>
-
-      <SectionHeader label="On Hold" count={onHold.length} />
-      <div>
-        {onHold.map((ev) => (
-          <EventRow key={ev.id} {...rowProps(ev, "hold")} />
-        ))}
-        {onHold.length === 0 && (
-          <p className="px-4 py-4 text-xs text-dim">Keine Meldungen on hold.</p>
+        {pending.length === 0 && (
+          <p className="px-4 py-4 text-xs text-dim">Keine ausstehenden Meldungen.</p>
         )}
       </div>
 

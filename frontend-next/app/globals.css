@@ -1,19 +1,43 @@
 @import "tailwindcss";
 
 @theme {
-  /* Neutrale Graustufen ohne Farbstich: Canvas dunkel, Flächen in kleinen,
-     gleichmäßigen Helligkeitsschritten. Tiefe über Ton, nicht über Rahmen. */
-  --color-bg: #161616;
-  --color-panel: #1f1f1f;
-  --color-card: #292929;
-  --color-line: #383838;
+  --color-bg: #0a0a0a;
+  --color-panel: #111111;
+  --color-card: #1a1a1a;
+  --color-card-elevated: #222222;
+  --color-line: #2a2a2a;
+  --color-hover: rgba(255, 255, 255, 0.05);
   --color-ink: #f5f5f5;
-  --color-mute: #9c9c9c;
-  --color-dim: #828282;
-  --color-soft: #cacaca;
-  /* Akzent nur für Interaktion/Info: desaturiertes kühles Blau, klar von den
-     Statusfarben (Rot/Amber/Grün) getrennt, damit "klickbar" nie "kritisch" liest. */
-  --color-accent: #6d8db5;
+  --color-mute: #8a8a8a;
+  --color-dim: #6b6b6b;
+  --color-soft: #b0b0b0;
+  --color-accent: #4d94ff;
+  --color-warning: #ff944d;
+  --color-warning-soft: #ffc14d;
+  --color-success: #3fb36b;
+  --color-danger: #ff4d4d;
+  --color-info: #6b6b6b;
+  --color-sidebar-active: #1e1e1e;
+}
+
+[data-theme="light"] {
+  --color-bg: #f4f5f7;
+  --color-panel: #ffffff;
+  --color-card: #f0f1f4;
+  --color-card-elevated: #e8eaef;
+  --color-line: #e2e4ea;
+  --color-hover: rgba(0, 0, 0, 0.04);
+  --color-ink: #141414;
+  --color-mute: #5c6370;
+  --color-dim: #737986;
+  --color-soft: #3d4450;
+  --color-accent: #4a6fa5;
+  --color-warning: #e07a2f;
+  --color-warning-soft: #c9a227;
+  --color-success: #2d8a52;
+  --color-danger: #c73e3e;
+  --color-info: #737986;
+  --color-sidebar-active: #eef0f4;
 }
 
 body {
@@ -27,7 +51,7 @@ body {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #383838;
+  background: var(--color-line);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-track {
@@ -54,8 +78,28 @@ body {
   animation: cwFadeIn 0.25s ease;
 }
 
-/* Karten-Pins: das Wurzel-Element positioniert MapLibre per transform,
-   skaliert wird deshalb nur der innere Button */
+@keyframes livePulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 60%, transparent);
+  }
+  50% {
+    opacity: 0.85;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-success) 0%, transparent);
+  }
+}
+
+.live-dot {
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+.dashboard-widget {
+  border-radius: 12px;
+  border: 1px solid var(--color-line);
+  background: var(--color-card);
+}
+
 .cw-pin {
   display: grid;
   place-items: center;
@@ -65,7 +109,7 @@ body {
   background: var(--pin, #6d8db5);
   color: #141414;
   border: 2px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
@@ -80,7 +124,7 @@ body {
   transform: scale(1.28);
   box-shadow:
     0 0 0 6px color-mix(in srgb, var(--pin) 30%, transparent),
-    0 8px 22px rgba(0, 0, 0, 0.5);
+    0 8px 22px rgba(0, 0, 0, 0.35);
 }
 .cw-pin.is-dim {
   opacity: 0.45;
@@ -89,11 +133,10 @@ body {
   border: 1.5px dashed rgba(245, 245, 245, 0.6);
 }
 
-/* Signal-Punkte im Modus "Nur dieses Event": je Quellart Farbe UND Form */
 .cw-dot {
   width: 11px;
   height: 11px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .cw-dot-social {
   background: #9c9c9c;
@@ -110,19 +153,18 @@ body {
 }
 
 .maplibregl-ctrl-attrib {
-  background: rgba(22, 22, 22, 0.7) !important;
-  color: #9c9c9c;
+  background: color-mix(in srgb, var(--color-panel) 85%, transparent) !important;
+  color: var(--color-mute);
   font-size: 10px;
   border-radius: 8px 0 0 0;
 }
 .maplibregl-ctrl-attrib a {
-  color: #9c9c9c !important;
+  color: var(--color-mute) !important;
 }
 .maplibregl-canvas:focus {
   outline: none;
 }
 
-/* Ungelesene neue Signale an einem Event (Queue + Karte) */
 @keyframes cwUnreadPulse {
   0%,
   100% {
@@ -168,7 +210,7 @@ body {
   height: 10px;
   border-radius: 9999px;
   background: var(--color-accent);
-  border: 2px solid #161616;
+  border: 2px solid var(--color-bg);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent);
   animation: cwUnreadPulse 2.4s ease-in-out infinite;
   pointer-events: none;

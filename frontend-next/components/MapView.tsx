@@ -7,11 +7,13 @@ import { Minus, Plus } from "lucide-react";
 import type { Event as CwEvent, EventType } from "@/lib/types";
 import { SEV, URGENCY_LABEL, konfidenzStufe, signalPoints } from "@/lib/ui";
 import { Chip } from "./ui";
+import { useTheme } from "@/components/providers/ThemeProvider";
 
 const VERDACHT_ICON =
   '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>';
 
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
 /** Lucide-Pfade als rohe SVG-Strings, da Marker imperatives DOM sind */
 const ICON_SVG: Record<EventType, string> = {
@@ -49,6 +51,10 @@ interface Props {
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
   onOpenDetail: () => void;
+  /** Read-only overview: hides mode controls and detail popover actions */
+  compact?: boolean;
+  /** Fit map bounds to all events when no active event is selected */
+  overviewFit?: boolean;
 }
 
 export default function MapView({
@@ -61,7 +67,11 @@ export default function MapView({
   onSelect,
   onHover,
   onOpenDetail,
+  compact = false,
+  overviewFit = false,
 }: Props) {
+  const { theme } = useTheme();
+  const mapStyle = theme === "light" ? MAP_STYLE_LIGHT : MAP_STYLE_DARK;
   const containerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<MarkerEntry[]>([]);
   const [mapInst, setMapInst] = useState<maplibregl.Map | null>(null);
@@ -75,9 +85,9 @@ export default function MapView({
     if (!containerRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: MAP_STYLE,
+      style: mapStyle,
       center: [9.797, 48.801],
-      zoom: 12.2,
+      zoom: compact ? 10.5 : 12.2,
     });
     map.on("click", () => setPopoverId(null));
     // Containergröße kann sich nach dem Init ändern (Grid-Layout, Overlay, Resize)
@@ -89,7 +99,23 @@ export default function MapView({
       map.remove();
       setMapInst(null);
     };
-  }, []);
+  }, [mapStyle, compact]);
+
+  useEffect(() => {
+    if (!mapInst) return;
+    mapInst.setStyle(mapStyle);
+  }, [mapInst, mapStyle]);
+
+  // Fit all events in compact or overview mode
+  useEffect(() => {
+    if (!mapInst || (!compact && !overviewFit) || events.length === 0 || active) return;
+    const coords = events.map((e) => [e.lon, e.lat] as [number, number]);
+    const bounds = coords.reduce(
+      (b, p) => b.extend(p),
+      new maplibregl.LngLatBounds(coords[0], coords[0])
+    );
+    mapInst.fitBounds(bounds, { padding: 48, maxZoom: compact ? 12 : 11, duration: 700 });
+  }, [mapInst, compact, overviewFit, events, active?.id]);
 
   // Marker auf- und abbauen, abhängig von Modus, Events und aktivem Event
   useEffect(() => {
@@ -236,25 +262,27 @@ export default function MapView({
       {/* h-full/w-full statt nur inset-0: MapLibres Stylesheet setzt position:relative auf den Container */}
       <div ref={containerRef} className="absolute inset-0 h-full w-full" />
 
-      <div className="absolute left-3 top-3 z-20 flex rounded-md border border-line bg-bg/90 p-[3px] backdrop-blur">
-        <button
-          type="button"
-          onClick={() => onMode("event")}
-          disabled={!active}
-          aria-pressed={mode === "event"}
-          className={modeBtn(mode === "event")}
-        >
-          Nur dieses Event
-        </button>
-        <button
-          type="button"
-          onClick={() => onMode("alle")}
-          aria-pressed={mode === "alle"}
-          className={modeBtn(mode === "alle")}
-        >
-          Alle Lagen
-        </button>
-      </div>
+      {!compact && (
+        <div className="absolute left-3 top-3 z-20 flex rounded-md border border-line bg-bg/90 p-[3px] backdrop-blur">
+          <button
+            type="button"
+            onClick={() => onMode("event")}
+            disabled={!active}
+            aria-pressed={mode === "event"}
+            className={modeBtn(mode === "event")}
+          >
+            Nur dieses Event
+          </button>
+          <button
+            type="button"
+            onClick={() => onMode("alle")}
+            aria-pressed={mode === "alle"}
+            className={modeBtn(mode === "alle")}
+          >
+            Alle Lagen
+          </button>
+        </div>
+      )}
 
       <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">
         <button
@@ -275,7 +303,7 @@ export default function MapView({
         </button>
       </div>
 
-      {mode === "event" && active && (
+      {mode === "event" && active && !compact && (
         <div className="absolute bottom-3 left-3 z-20 max-w-[280px] rounded-lg border border-line bg-bg/90 p-3 backdrop-blur">
           <p className="text-xs font-bold">
             {sigCounts.total >= 2
@@ -305,7 +333,7 @@ export default function MapView({
         </div>
       )}
 
-      {popEvent && popPos && (
+      {popEvent && popPos && !compact && (
         <div
           className="absolute z-30"
           style={{

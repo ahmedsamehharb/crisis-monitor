@@ -76,7 +76,7 @@ export function Pill({
       className={`rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
         active
           ? "border-accent/50 bg-accent/15 text-accent"
-          : "border-line bg-transparent text-mute hover:text-ink"
+          : "border-line bg-transparent text-mute hover:bg-hover hover:text-ink"
       }`}
     >
       {children}
