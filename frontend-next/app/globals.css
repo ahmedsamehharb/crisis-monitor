@@ -121,3 +121,55 @@ body {
 .maplibregl-canvas:focus {
   outline: none;
 }
+
+/* Ungelesene neue Signale an einem Event (Queue + Karte) */
+@keyframes cwUnreadPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+
+.cw-unread-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  border: 1.5px solid var(--color-panel);
+  animation: cwUnreadPulse 2.4s ease-in-out infinite;
+}
+
+.cw-unread-dot-count {
+  width: auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-width: 2px;
+}
+
+.cw-pin-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.cw-pin-unread {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  z-index: 2;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  border: 2px solid #161616;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  animation: cwUnreadPulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}

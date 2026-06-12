@@ -19,7 +19,7 @@ import {
   quellenStat,
   trendRichtung,
 } from "@/lib/ui";
-import { KonfidenzText, TrendPfeil } from "./ui";
+import { KonfidenzText, TrendPfeil, UnreadDot } from "./ui";
 
 const DANGER = "#E5484D";
 const WARNING = "#E7B53C";
@@ -33,6 +33,7 @@ interface RowProps {
   nowIso: string;
   active: boolean;
   hovered: boolean;
+  unreadCount: number;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
 }
@@ -42,7 +43,16 @@ interface RowProps {
  * Titel, Subzeile, rechts genau ein Wert. Fake-Verdacht und On-Hold-Highlight
  * unterscheiden sich nur über Statuszeile und Kantenfarbe, nicht über die Form.
  */
-function EventRow({ ev, bereich, nowIso, active, hovered, onSelect, onHover }: RowProps) {
+function EventRow({
+  ev,
+  bereich,
+  nowIso,
+  active,
+  hovered,
+  unreadCount,
+  onSelect,
+  onHover,
+}: RowProps) {
   const Icon = ev.verdacht ? TriangleAlert : TYPE_ICON[ev.eventType];
   const hinweis = bereich === "hold" ? holdHinweis(ev) : null;
   const kante = ev.verdacht ? DANGER : hinweis ? WARNING : SEV[ev.urgency];
@@ -101,8 +111,13 @@ function EventRow({ ev, bereich, nowIso, active, hovered, onSelect, onHover }: R
           strokeWidth={2}
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium leading-tight text-ink">
-            {ev.titel}
+          <span className="flex items-center gap-1.5">
+            <span className="block min-w-0 flex-1 truncate text-[13px] font-medium leading-tight text-ink">
+              {ev.titel}
+            </span>
+            {unreadCount > 0 && bereich !== "archiv" ? (
+              <UnreadDot count={unreadCount} />
+            ) : null}
           </span>
           <span className="mt-0.5 block truncate text-[11px] text-mute">{subzeile}</span>
         </span>
@@ -161,6 +176,7 @@ interface Props {
   nowIso: string;
   selectedId: string;
   hoveredId: string | null;
+  unreadByEventId: Record<string, number>;
   sortBy: "urgency" | "confidence";
   onSortBy: (v: "urgency" | "confidence") => void;
   onSelect: (id: string) => void;
@@ -174,6 +190,7 @@ export default function QueueColumn({
   nowIso,
   selectedId,
   hoveredId,
+  unreadByEventId,
   sortBy,
   onSortBy,
   onSelect,
@@ -187,6 +204,7 @@ export default function QueueColumn({
     nowIso,
     active: ev.id === selectedId,
     hovered: ev.id === hoveredId && ev.id !== selectedId,
+    unreadCount: unreadByEventId[ev.id] ?? 0,
     onSelect,
     onHover,
   });

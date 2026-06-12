@@ -140,12 +140,38 @@ export function fmtVor(min: number): string {
   return `vor ${min} Min`;
 }
 
-export function sortQueue(list: CwEvent[], by: "urgency" | "confidence"): CwEvent[] {
-  return [...list].sort((a, b) =>
-    by === "urgency"
+function activityMs(ev: CwEvent): number {
+  const raw = ev.lastUpdatedAt ?? ev.wann;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Warteschlange sortieren: Events mit neuen Signalen (unread) zuerst,
+ * darunter nach Dringlichkeit oder Konfidenz.
+ */
+export function sortQueue(
+  list: CwEvent[],
+  by: "urgency" | "confidence",
+  unreadByEventId: Record<string, number> = {}
+): CwEvent[] {
+  return [...list].sort((a, b) => {
+    const unreadA = unreadByEventId[a.id] ?? 0;
+    const unreadB = unreadByEventId[b.id] ?? 0;
+
+    if (unreadA > 0 && unreadB === 0) return -1;
+    if (unreadB > 0 && unreadA === 0) return 1;
+
+    if (unreadA > 0 && unreadB > 0) {
+      if (unreadB !== unreadA) return unreadB - unreadA;
+      const timeDiff = activityMs(b) - activityMs(a);
+      if (timeDiff !== 0) return timeDiff;
+    }
+
+    return by === "urgency"
       ? b.urgency - a.urgency || b.confidence - a.confidence
-      : b.confidence - a.confidence || b.urgency - a.urgency
-  );
+      : b.confidence - a.confidence || b.urgency - a.urgency;
+  });
 }
 
 export type SignalKind = "social" | "wetter" | "amtlich";
@@ -176,4 +202,14 @@ export function signalPoints(ev: CwEvent): SignalPoint[] {
     }
   });
   return pts;
+}
+
+/** Anzahl Roh-Signale eines Events (API-Feld oder Belege summiert). */
+export function countSignals(ev: CwEvent): number {
+  if (ev.signalCount != null && ev.signalCount > 0) return ev.signalCount;
+  const social = ev.belege.social?.posts.length ?? 0;
+  const wetter = ev.belege.wetter?.length ?? 0;
+  const amtlich = ev.belege.amtlich?.length ?? 0;
+  const total = social + wetter + amtlich;
+  return total > 0 ? total : 1;
 }

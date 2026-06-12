@@ -8,6 +8,14 @@ import Topbar from "@/components/Topbar";
 import { INITIAL_EVENTS, MOCK_NOW } from "@/data/events";
 import { fetchEvents } from "@/lib/api";
 import type { Event as CwEvent, EventStatus } from "@/lib/types";
+import {
+  clearUnreadFor,
+  computeUnreadMap,
+  markEventSeen,
+  seedSeenCounts,
+  type SeenSignalCounts,
+  type UnreadMap,
+} from "@/lib/unread";
 import { sortQueue } from "@/lib/ui";
 
 type DatenQuelle = "lädt" | "backend" | "mock";
@@ -49,7 +57,18 @@ export default function Home() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [nowIso, setNowIso] = useState<string>(MOCK_NOW);
   const [quelle, setQuelle] = useState<DatenQuelle>("lädt");
+  const [unreadByEventId, setUnreadByEventId] = useState<UnreadMap>({});
   const hadBackendRef = useRef(false);
+  const seenSignalsRef = useRef<SeenSignalCounts>({});
+  const baselineSeededRef = useRef(false);
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+
+  const markSeen = useCallback((event: CwEvent | undefined) => {
+    if (!event) return;
+    seenSignalsRef.current = markEventSeen(seenSignalsRef.current, event);
+    setUnreadByEventId((prev) => clearUnreadFor(prev, event.id));
+  }, []);
 
   const loadFromBackend = useCallback(async (signal: AbortSignal, isInitial: boolean) => {
     try {
@@ -65,7 +84,24 @@ export default function Home() {
       }
 
       hadBackendRef.current = true;
-      setEvents((prev) => mergeLocalStatus(prev, echte));
+      setEvents((prev) => {
+        const merged = mergeLocalStatus(prev, echte);
+
+        if (!baselineSeededRef.current) {
+          seenSignalsRef.current = seedSeenCounts(merged);
+          baselineSeededRef.current = true;
+          setUnreadByEventId({});
+        } else {
+          const viewingId = selectedIdRef.current;
+          const viewing = merged.find((e) => e.id === viewingId);
+          if (viewing) {
+            seenSignalsRef.current = markEventSeen(seenSignalsRef.current, viewing);
+          }
+          setUnreadByEventId(computeUnreadMap(merged, seenSignalsRef.current, viewingId));
+        }
+
+        return merged;
+      });
       setNowIso(new Date().toISOString());
       setQuelle("backend");
 
@@ -113,13 +149,23 @@ export default function Home() {
   );
 
   const eingang = useMemo(
-    () => sortQueue(events.filter((e) => e.status === "neu").filter(inGemeinde), sortBy),
-    [events, inGemeinde, sortBy]
+    () =>
+      sortQueue(
+        events.filter((e) => e.status === "neu").filter(inGemeinde),
+        sortBy,
+        unreadByEventId
+      ),
+    [events, inGemeinde, sortBy, unreadByEventId]
   );
 
   const onHold = useMemo(
-    () => sortQueue(events.filter((e) => e.status === "hold").filter(inGemeinde), sortBy),
-    [events, inGemeinde, sortBy]
+    () =>
+      sortQueue(
+        events.filter((e) => e.status === "hold").filter(inGemeinde),
+        sortBy,
+        unreadByEventId
+      ),
+    [events, inGemeinde, sortBy, unreadByEventId]
   );
 
   const mapEvents = useMemo(() => events.filter(inGemeinde), [events, inGemeinde]);
@@ -131,10 +177,23 @@ export default function Home() {
 
   const selected = events.find((e) => e.id === selectedId);
 
-  const selectEvent = useCallback((id: string) => {
-    setSelectedId(id);
-    setDetailOpen(true);
-  }, []);
+  const selectEvent = useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      setDetailOpen(true);
+      const ev = events.find((e) => e.id === id);
+      markSeen(ev);
+    },
+    [events, markSeen]
+  );
+
+  /** Geoeffnetes Event: neue Signale gelten sofort als gelesen. */
+  useEffect(() => {
+    const ev = events.find((e) => e.id === selectedId);
+    if (!ev) return;
+    seenSignalsRef.current = markEventSeen(seenSignalsRef.current, ev);
+    setUnreadByEventId((prev) => clearUnreadFor(prev, ev.id));
+  }, [selectedId, events]);
 
   const decide = useCallback(
     (id: string, status: EventStatus, notiz: string) => {
@@ -204,6 +263,7 @@ export default function Home() {
           nowIso={nowIso}
           selectedId={selectedId}
           hoveredId={hoveredId}
+          unreadByEventId={unreadByEventId}
           sortBy={sortBy}
           onSortBy={setSortBy}
           onSelect={selectEvent}
@@ -233,6 +293,7 @@ export default function Home() {
             events={mapEvents}
             active={selected}
             hoveredId={hoveredId}
+            unreadByEventId={unreadByEventId}
             mode={mapMode}
             onMode={setMapMode}
             onSelect={selectEvent}

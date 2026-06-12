@@ -43,6 +43,7 @@ interface Props {
   events: CwEvent[];
   active?: CwEvent;
   hoveredId: string | null;
+  unreadByEventId: Record<string, number>;
   mode: "event" | "alle";
   onMode: (m: "event" | "alle") => void;
   onSelect: (id: string) => void;
@@ -54,6 +55,7 @@ export default function MapView({
   events,
   active,
   hoveredId,
+  unreadByEventId,
   mode,
   onMode,
   onSelect,
@@ -114,6 +116,7 @@ export default function MapView({
     const pins = mode === "event" && active ? [active] : events;
     pins.forEach((ev) => {
       const root = document.createElement("div");
+      root.className = "cw-pin-wrap";
       const el = document.createElement("button");
       el.type = "button";
       el.className = "cw-pin";
@@ -132,12 +135,18 @@ export default function MapView({
       el.addEventListener("mouseenter", () => cbRef.current.onHover(ev.id));
       el.addEventListener("mouseleave", () => cbRef.current.onHover(null));
       root.appendChild(el);
+      if ((unreadByEventId[ev.id] ?? 0) > 0) {
+        const dot = document.createElement("span");
+        dot.className = "cw-pin-unread";
+        dot.setAttribute("aria-hidden", "true");
+        root.appendChild(dot);
+      }
       const marker = new maplibregl.Marker({ element: root, anchor: "center" })
         .setLngLat([ev.lon, ev.lat])
         .addTo(mapInst);
       markersRef.current.push({ id: ev.id, marker, el, root, isEvent: true });
     });
-  }, [mapInst, events, mode, active]);
+  }, [mapInst, events, mode, active, unreadByEventId]);
 
   // Verknüpfte Markierung: aktiv und Hover auf den Pins spiegeln
   useEffect(() => {

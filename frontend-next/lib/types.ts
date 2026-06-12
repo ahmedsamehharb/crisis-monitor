@@ -132,4 +132,8 @@ export interface Event {
   notiz?: string;
   /** Uhrzeit der Bewertung (HH:MM), gesetzt bei bestaetigt/abgelehnt */
   bewertetUm?: string;
+  /** Geclusterte Roh-Signale — fuer Unread-Erkennung bei neuen Belegen */
+  signalCount?: number;
+  /** Letztes Update am Backend-Cluster */
+  lastUpdatedAt?: string;
 }

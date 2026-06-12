@@ -427,6 +427,8 @@ function buildEventFromSignals(
     urteil: buildUrteil(sorted, ort, typeDe, verifiziert, belege),
     belege,
     status: "neu",
+    signalCount: rollup?.reportIds?.length ?? n,
+    lastUpdatedAt: rollup?.lastUpdatedAt ?? first?.createdAt,
   };
 }
 
@@ -472,6 +474,8 @@ export function mapCrisisEventToEvent(
     },
     belege: {},
     status: "neu",
+    signalCount: cluster.reportIds.length,
+    lastUpdatedAt: cluster.lastUpdatedAt,
   };
 }
 

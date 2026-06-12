@@ -18,6 +18,31 @@ import {
   type TrendRichtung,
 } from "@/lib/ui";
 
+/** Ungelesene neue Signale — dezenter Akzent-Punkt wie Chat-Badge, passend zum Dark-UI */
+export function UnreadDot({
+  count = 1,
+  className = "",
+}: {
+  count?: number;
+  className?: string;
+}) {
+  if (count <= 0) return null;
+  const showCount = count > 1;
+  return (
+    <span
+      className={`cw-unread-dot shrink-0 ${showCount ? "cw-unread-dot-count" : ""} ${className}`}
+      aria-label={`${count} neue Signal${count === 1 ? "" : "e"}`}
+      title={`${count} neue Signal${count === 1 ? "" : "e"}`}
+    >
+      {showCount ? (
+        <span className="text-[9px] font-bold leading-none text-[#161616]">
+          {count > 9 ? "9+" : count}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function Chip({
   children,
   className = "",
