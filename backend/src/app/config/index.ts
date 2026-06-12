@@ -84,6 +84,12 @@ export const config = {
     pollIntervalMs: Number(process.env.NINA_POLL_INTERVAL_MS) || 60000,
   },
 
+  mobidata: {
+    enabled: process.env.MOBIDATA_ENABLED !== 'false',
+    apiUrl: process.env.MOBIDATA_API_URL || '',
+    pollIntervalMs: Number(process.env.MOBIDATA_POLL_INTERVAL_MS) || 300_000,
+  },
+
   geocoding: {
     enabled: process.env.GEOCODING_ENABLED !== 'false',
     llmBaseUrl:
