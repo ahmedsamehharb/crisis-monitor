@@ -12,6 +12,7 @@ import { DwdAdapter } from './adapters/dwd/dwd.adapter.js';
 import { FirmsAdapter } from './adapters/fires/fires.adapter.js';
 import { NinaAdapter } from '../nina/nina.adapter.js';
 import { eventsService } from '../events/events.service.js';
+import MobidataAdapter from './adapters/mobidata/mobidata.adapter.js';
 
 export class IngestionService {
   private adapters: IngestionAdapter[] = [];
@@ -40,6 +41,9 @@ export class IngestionService {
     if (config.nina.enabled) {
       this.register(new NinaAdapter());
     }
+    if (config.mobidata?.enabled) { // config dosyasında enable/disable kontrolü için
+      this.register(new MobidataAdapter());
+  }
   }
 
   start(): void {

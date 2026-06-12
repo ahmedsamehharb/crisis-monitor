@@ -7,6 +7,7 @@ export type DataSourceId =
   | 'nina'
   | 'hvz'
   | 'police'
+  | 'mobidata'
   | 'news';
 
 export type CrisisEventType =
