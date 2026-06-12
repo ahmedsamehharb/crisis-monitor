@@ -1,15 +1,16 @@
 import { isDatabaseEnabled, prisma } from '../../shared/database/prisma.js';
-import type { IngestedReport } from '../normalization/report.types.js';
+import type { IngestedReport, ScoredReport } from '../normalization/report.types.js';
 
 /** Persists reports when DATABASE_URL is configured; otherwise in-memory fallback */
 export class EventsRepository {
-  private memory: IngestedReport[] = [];
+  private memory = new Map<string, IngestedReport>();
 
-  async save(report: IngestedReport): Promise<void> {
-    this.memory.unshift(report);
-    if (this.memory.length > 500) this.memory.pop();
+  async save(report: IngestedReport): Promise<string> {
+    const memoryKey = `${report.source}:${report.sourceId}`;
+    const stored = { ...report, id: report.id || memoryKey };
+    this.memory.set(memoryKey, stored);
 
-    if (!isDatabaseEnabled() || !prisma) return;
+    if (!isDatabaseEnabled() || !prisma) return stored.id;
 
     const latitude =
       report.location?.lat ?? num(report.metadata.latitude);
@@ -21,7 +22,7 @@ export class EventsRepository {
       str(report.metadata.locationLabel);
 
     try {
-      await prisma.report.upsert({
+      const row = await prisma.report.upsert({
         where: {
           source_sourceId: { source: report.source, sourceId: report.sourceId },
         },
@@ -50,15 +51,46 @@ export class EventsRepository {
           severityScore: report.severity,
         },
       });
+      const withId = { ...stored, id: row.id };
+      this.memory.set(row.id, withId);
+      this.memory.set(memoryKey, withId);
+      return row.id;
     } catch {
-      // DB optional during hackathon — in-memory store remains authoritative
+      return stored.id;
+    }
+  }
+
+  async findById(id: string): Promise<IngestedReport | null> {
+    for (const r of this.memory.values()) {
+      if (r.id === id) return r;
+    }
+
+    if (!isDatabaseEnabled() || !prisma) return null;
+
+    try {
+      const row = await prisma.report.findUnique({ where: { id } });
+      if (!row) return null;
+      return rowToReport(row);
+    } catch {
+      return null;
     }
   }
 
   async findRecent(limit = 50): Promise<IngestedReport[]> {
-    if (!isDatabaseEnabled() || !prisma) {
-      return this.memory.slice(0, limit);
-    }
+    const seen = new Set<string>();
+    const mem = [...this.memory.values()]
+      .filter((r) => {
+        if (seen.has(r.id)) return false;
+        seen.add(r.id);
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+      .slice(0, limit);
+
+    if (!isDatabaseEnabled() || !prisma) return mem;
 
     try {
       const rows = await prisma.report.findMany({
@@ -66,37 +98,59 @@ export class EventsRepository {
         take: limit,
       });
 
-      return rows.map((row) => ({
-        id: row.id,
-        source: row.source as IngestedReport['source'],
-        sourceId: row.sourceId,
-        rawText: row.rawText,
-        url: row.url || '',
-        author: row.author || '',
-        createdAt: row.createdAt.toISOString(),
-        ingestedAt: row.ingestedAt.toISOString(),
-        keywords: row.keywords,
-        eventType: (row.eventType as IngestedReport['eventType']) || 'unknown',
-        mediaUrls: [],
-        trust: row.credibilityScore ?? undefined,
-        severity: row.severityScore ?? undefined,
-        location: {
-          lat: row.latitude ?? undefined,
-          lon: row.longitude ?? undefined,
-          municipality: row.locationLabel ?? undefined,
-        },
-        metadata: {
-          latitude: row.latitude ?? undefined,
-          longitude: row.longitude ?? undefined,
-          locationLabel: row.locationLabel ?? undefined,
-          trust: row.credibilityScore ?? undefined,
-          severity: row.severityScore ?? undefined,
-        },
-      }));
+      return rows.map(rowToReport);
     } catch {
-      return this.memory.slice(0, limit);
+      return mem;
     }
   }
+}
+
+function rowToReport(row: {
+  id: string;
+  source: string;
+  sourceId: string;
+  rawText: string;
+  url: string | null;
+  author: string | null;
+  createdAt: Date;
+  ingestedAt: Date;
+  keywords: string[];
+  eventType: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  locationLabel: string | null;
+  credibilityScore: number | null;
+  severityScore: number | null;
+  crisisEventId: string | null;
+}): ScoredReport {
+  return {
+    id: row.id,
+    source: row.source as IngestedReport['source'],
+    sourceId: row.sourceId,
+    rawText: row.rawText,
+    url: row.url || '',
+    author: row.author || '',
+    createdAt: row.createdAt.toISOString(),
+    ingestedAt: row.ingestedAt.toISOString(),
+    keywords: row.keywords,
+    eventType: (row.eventType as IngestedReport['eventType']) || 'unknown',
+    mediaUrls: [],
+    trust: row.credibilityScore ?? 0,
+    severity: row.severityScore ?? 0,
+    location: {
+      lat: row.latitude ?? undefined,
+      lon: row.longitude ?? undefined,
+      municipality: row.locationLabel ?? undefined,
+    },
+    metadata: {
+      latitude: row.latitude ?? undefined,
+      longitude: row.longitude ?? undefined,
+      locationLabel: row.locationLabel ?? undefined,
+      trust: row.credibilityScore ?? undefined,
+      severity: row.severityScore ?? undefined,
+      crisisEventId: row.crisisEventId ?? undefined,
+    },
+  };
 }
 
 export const eventsRepository = new EventsRepository();

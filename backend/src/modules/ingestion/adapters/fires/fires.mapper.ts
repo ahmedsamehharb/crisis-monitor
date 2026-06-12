@@ -1,3 +1,4 @@
+import { locationFromCoordinates } from '../../../normalization/report-location.js';
 import type { IngestedReport } from '../../../normalization/report.types.js';
 import { mapFirmsEventType } from './fires.eventType.js';
 import type { FirmsClusterContext, FirmsHotspot } from './fires.types.js';
@@ -96,6 +97,8 @@ export function mapFirmsHotspotToReport(
     keywords: ['Waldbrand', 'Feuer', 'FIRMS'],
     eventType: mapFirmsEventType(),
     mediaUrls: [],
+    trust: FIRMS_TRUST,
+    location: locationFromCoordinates(hotspot.latitude, hotspot.longitude),
     metadata: {
       confidence,
       confidencePercent,

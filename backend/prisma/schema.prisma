@@ -8,42 +8,56 @@ datasource db {
 }
 
 /// Normalized crisis report after ingestion pipeline.
-/// TODO: extend fields as geocoding, scoring, and correlation modules land.
 model Report {
-  id              String   @id @default(cuid())
-  source          String
-  sourceId        String
-  rawText         String
-  url             String?
-  author          String?
-  createdAt       DateTime
-  ingestedAt      DateTime @default(now())
-  keywords        String[]
-  eventType       String?
-  latitude        Float?
-  longitude       Float?
-  locationLabel   String?
+  id               String   @id @default(cuid())
+  source           String
+  sourceId         String
+  rawText          String
+  url              String?
+  author           String?
+  createdAt        DateTime
+  ingestedAt       DateTime @default(now())
+  keywords         String[]
+  eventType        String?
+  latitude         Float?
+  longitude        Float?
+  locationLabel    String?
   credibilityScore Float?
-  severityScore   Float?
-  summary         String?
-  processed       Boolean  @default(false)
+  severityScore    Float?
+  summary          String?
+  processed        Boolean  @default(false)
+  crisisEventId    String?
+
+  crisisEvent CrisisEvent? @relation(fields: [crisisEventId], references: [id], onDelete: SetNull)
 
   @@unique([source, sourceId])
   @@index([createdAt])
   @@index([eventType])
+  @@index([crisisEventId])
 }
 
+/// Clustered crisis event aggregating multiple signals (reports).
 model CrisisEvent {
-  id          String   @id @default(cuid())
-  title       String
-  eventType   String
-  status      String   @default("open")
-  latitude    Float?
-  longitude   Float?
-  summary     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  reportIds   String[]
+  id               String   @id @default(cuid())
+  title            String
+  eventType        String
+  status           String   @default("open")
+  latitude         Float?
+  longitude        Float?
+  locationLabel    String?
+  summary          String?
+  credibilityScore Float?
+  severityScore    Float?
+  sourceCount      Int      @default(1)
+  firstDetectedAt  DateTime @default(now())
+  lastUpdatedAt    DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  reportIds        String[]
+
+  reports Report[]
 
   @@index([status])
+  @@index([eventType])
+  @@index([lastUpdatedAt])
 }

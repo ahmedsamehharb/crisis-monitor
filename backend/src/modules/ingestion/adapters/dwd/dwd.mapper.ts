@@ -1,3 +1,7 @@
+import {
+  locationFromCoordinates,
+  locationFromRegion,
+} from '../../../normalization/report-location.js';
 import type { IngestedReport } from '../../../normalization/report.types.js';
 import {
   mapDwdEventToCrisisType,
@@ -21,6 +25,20 @@ export function mapDwdWarningToReport(warning: DwdWarning): IngestedReport {
   const eventType = mapDwdEventToCrisisType(warning.event);
   const keywords = buildKeywords(warning);
 
+  const { lat, lon } = warning.location;
+  const location =
+    lat !== undefined && lon !== undefined
+      ? locationFromCoordinates(lat, lon, {
+          municipality: warning.location.region,
+          district: warning.areaDesc,
+          state: warning.location.state ?? 'Baden-Württemberg',
+        })
+      : locationFromRegion({
+          municipality: warning.location.region,
+          district: warning.areaDesc,
+          state: warning.location.state ?? 'Baden-Württemberg',
+        });
+
   return {
     id: `dwd:${warning.sourceId}`,
     source: 'dwd',
@@ -33,6 +51,8 @@ export function mapDwdWarningToReport(warning: DwdWarning): IngestedReport {
     keywords,
     eventType,
     mediaUrls: [],
+    trust: DWD_TRUST,
+    location,
     metadata: {
       severity: normalizeDwdSeverity(warning.severityLevel),
       trust: DWD_TRUST,

@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { healthRouter } from '../modules/health/health.controller.js';
-import { eventsRouter } from '../modules/events/events.controller.js';
+import { eventsRouter, reportsRouter } from '../modules/events/events.controller.js';
 import { sourcesRouter } from '../modules/sources/sources.controller.js';
 
 export function createApp() {
@@ -12,6 +12,7 @@ export function createApp() {
 
   app.use('/api/health', healthRouter);
   app.use('/api/events', eventsRouter);
+  app.use('/api/reports', reportsRouter);
   app.use('/api/sources', sourcesRouter);
 
   return app;

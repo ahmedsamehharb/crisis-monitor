@@ -12,7 +12,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "test": "echo \"Add tests in tests/\" && exit 0"
+    "test": "echo \"Add tests in tests/\" && exit 0",
+    "test:reports": "tsx scripts/test-ingested-reports.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",

@@ -1,3 +1,4 @@
+import { locationFromCoordinates } from '../../../normalization/report-location.js';
 import type { IngestedReport } from '../../../normalization/report.types.js';
 import {
   FLOOD_CHARACTERISTIC_SHORTNAMES,
@@ -113,6 +114,10 @@ export function mapPegelAlert(alert: PegelAlert): IngestedReport {
     keywords,
     eventType: 'flood',
     mediaUrls: [],
+    trust: 0.9,
+    location: locationFromCoordinates(station.latitude, station.longitude, {
+      municipality: station.longname,
+    }),
     metadata: {
       severity: alert.severity,
       water: water,

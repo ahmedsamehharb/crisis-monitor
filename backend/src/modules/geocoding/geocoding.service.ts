@@ -1,5 +1,9 @@
 import { config } from '../../app/config/index.js';
 import { logger } from '../../shared/logger/logger.js';
+import {
+  locationFromGeocode,
+  mergeReportLocation,
+} from '../normalization/report-location.js';
 import type { IngestedReport } from '../normalization/report.types.js';
 import { buildGeocodeQuery } from './geocode-query.js';
 import {
@@ -67,7 +71,7 @@ function attachGeoToReport(
   report: IngestedReport,
   geo: GeoLocation
 ): IngestedReport {
-  return {
+  const withMeta: IngestedReport = {
     ...report,
     metadata: {
       ...report.metadata,
@@ -80,6 +84,16 @@ function attachGeoToReport(
       extractedLocation: geo.extracted,
     },
   };
+
+  return mergeReportLocation(
+    withMeta,
+    locationFromGeocode(
+      geo.latitude,
+      geo.longitude,
+      geo.label,
+      geo.extracted
+    )
+  );
 }
 
 export class GeocodingService {

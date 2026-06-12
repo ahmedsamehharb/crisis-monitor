@@ -89,7 +89,7 @@ export class IngestionService {
           : undefined,
     });
 
-    void eventsService.persistReport(scored);
+    void eventsService.persistAndCluster(scored);
   }
 
   listSources(): { id: string; label: string }[] {
