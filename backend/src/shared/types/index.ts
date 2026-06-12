@@ -4,6 +4,7 @@ export type DataSourceId =
   | 'dwd'
   | 'pegelonline'
   | 'firms'
+  | 'nina'
   | 'hvz'
   | 'police'
   | 'news';

@@ -6,6 +6,7 @@ const SOURCE_BASE_TRUST: Record<DataSourceId, number> = {
   dwd: 0.95,
   pegelonline: 0.9,
   firms: 0.85,
+  nina: 0.95,
   bluesky: 0.5,
   mastodon: 0.5,
   hvz: 0.85,

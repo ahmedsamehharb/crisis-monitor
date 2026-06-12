@@ -76,6 +76,14 @@ export const config = {
     },
   },
 
+  nina: {
+    enabled: process.env.NINA_ENABLED !== 'false',
+    apiBase:
+      process.env.NINA_API_BASE ||
+      'https://warnung.bund.de/api31/mowas/mapData.json',
+    pollIntervalMs: Number(process.env.NINA_POLL_INTERVAL_MS) || 60000,
+  },
+
   geocoding: {
     enabled: process.env.GEOCODING_ENABLED !== 'false',
     llmBaseUrl:

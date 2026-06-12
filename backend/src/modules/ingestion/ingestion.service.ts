@@ -10,6 +10,7 @@ import { BlueskyAdapter } from './adapters/bluesky/bluesky.adapter.js';
 import { PegelonlineAdapter } from './adapters/pegelonline/pegel.adapter.js';
 import { DwdAdapter } from './adapters/dwd/dwd.adapter.js';
 import { FirmsAdapter } from './adapters/fires/fires.adapter.js';
+import { NinaAdapter } from '../nina/nina.adapter.js';
 import { eventsService } from '../events/events.service.js';
 
 export class IngestionService {
@@ -35,6 +36,9 @@ export class IngestionService {
     }
     if (config.firms.enabled) {
       this.register(new FirmsAdapter());
+    }
+    if (config.nina.enabled) {
+      this.register(new NinaAdapter());
     }
   }
 
@@ -106,6 +110,7 @@ function formatSourceLabel(source: string): string {
     pegelonline: 'PEGELONLINE',
     dwd: 'DWD',
     firms: 'NASA FIRMS',
+    nina: 'NINA (Warnapp)',
   };
   return labels[source] ?? source;
 }
