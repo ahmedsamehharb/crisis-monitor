@@ -3,6 +3,7 @@ export type DataSourceId =
   | 'bluesky'
   | 'dwd'
   | 'pegelonline'
+  | 'firms'
   | 'hvz'
   | 'police'
   | 'news';
@@ -10,6 +11,7 @@ export type DataSourceId =
 export type CrisisEventType =
   | 'flood'
   | 'fire'
+  | 'wildfire'
   | 'traffic_accident'
   | 'infrastructure_failure'
   | 'thunderstorm'

@@ -11,6 +11,10 @@ export class EventsRepository {
 
     if (!isDatabaseEnabled() || !prisma) return;
 
+    const latitude = num(report.metadata.latitude);
+    const longitude = num(report.metadata.longitude);
+    const locationLabel = str(report.metadata.locationLabel);
+
     try {
       await prisma.report.upsert({
       where: {
@@ -25,10 +29,16 @@ export class EventsRepository {
         createdAt: new Date(report.createdAt),
         keywords: report.keywords,
         eventType: report.eventType,
+        latitude,
+        longitude,
+        locationLabel,
       },
       update: {
         rawText: report.rawText,
         keywords: report.keywords,
+        latitude,
+        longitude,
+        locationLabel,
       },
     });
     } catch {
@@ -59,7 +69,11 @@ export class EventsRepository {
       keywords: row.keywords,
       eventType: (row.eventType as IngestedReport['eventType']) || 'unknown',
       mediaUrls: [],
-      metadata: {},
+      metadata: {
+        latitude: row.latitude ?? undefined,
+        longitude: row.longitude ?? undefined,
+        locationLabel: row.locationLabel ?? undefined,
+      },
     }));
     } catch {
       return this.memory.slice(0, limit);
@@ -68,3 +82,14 @@ export class EventsRepository {
 }
 
 export const eventsRepository = new EventsRepository();
+
+function num(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  return undefined;
+}
+
+function str(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const t = value.trim();
+  return t.length > 0 ? t : undefined;
+}

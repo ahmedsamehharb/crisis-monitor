@@ -7,7 +7,9 @@ import { MastodonAdapter } from './adapters/mastodon/mastodon.adapter.js';
 import { BlueskyAdapter } from './adapters/bluesky/bluesky.adapter.js';
 import { PegelonlineAdapter } from './adapters/pegelonline/pegel.adapter.js';
 import { DwdAdapter } from './adapters/dwd/dwd.adapter.js';
+import { FirmsAdapter } from './adapters/fires/fires.adapter.js';
 import { eventsService } from '../events/events.service.js';
+import { geocodingService } from '../geocoding/geocoding.service.js';
 
 export class IngestionService {
   private adapters: IngestionAdapter[] = [];
@@ -29,6 +31,9 @@ export class IngestionService {
     }
     if (config.dwd.enabled) {
       this.register(new DwdAdapter());
+    }
+    if (config.firms.enabled) {
+      this.register(new FirmsAdapter());
     }
   }
 
@@ -52,19 +57,33 @@ export class IngestionService {
   }
 
   private handleReport(raw: IngestedReport): void {
+    void this.processReport(raw);
+  }
+
+  private async processReport(raw: IngestedReport): Promise<void> {
     const report = normalizerService.normalize(raw);
     if (!report) return;
 
+    const enriched = await geocodingService.enrichReport(report);
+
+    const lat = enriched.metadata.latitude as number | undefined;
+    const lon = enriched.metadata.longitude as number | undefined;
+    const locationLabel = enriched.metadata.locationLabel as string | undefined;
+
     logCrisisMatch({
-      source: formatSourceLabel(report.source),
-      keywords: report.keywords,
-      author: report.author,
-      text: report.rawText,
-      url: report.url,
-      createdAt: report.createdAt,
+      source: formatSourceLabel(enriched.source),
+      keywords: enriched.keywords,
+      author: enriched.author,
+      text: enriched.rawText,
+      url: enriched.url,
+      createdAt: enriched.createdAt,
+      location:
+        lat !== undefined && lon !== undefined
+          ? { label: locationLabel, latitude: lat, longitude: lon }
+          : undefined,
     });
 
-    void eventsService.persistReport(report);
+    void eventsService.persistReport(enriched);
   }
 
   listSources(): { id: string; label: string }[] {
@@ -80,6 +99,7 @@ function formatSourceLabel(source: string): string {
     bluesky: 'Bluesky',
     pegelonline: 'PEGELONLINE',
     dwd: 'DWD',
+    firms: 'NASA FIRMS',
   };
   return labels[source] ?? source;
 }

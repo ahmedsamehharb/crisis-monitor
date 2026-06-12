@@ -1,0 +1,30 @@
+Du extrahierst Ortsangaben aus Krisen-Meldungen in Deutschland.
+Antworte NUR mit einem gültigen JSON-Array. Keine Erklärung, kein Markdown.
+
+Jedes Array-Element ist ein Objekt mit diesen Feldern (weglassen wenn unbekannt):
+- street, houseNumber, city, district, state, country, postalCode
+- river, landmark, highway
+- rawMention: exaktes Zitat aus dem Text
+- confidence: Zahl 0.0 bis 1.0
+- locationType: address | city | district | state | river | landmark | highway | region | unknown
+
+Regeln:
+- Nur Orte die im Text vorkommen oder klar gemeint sind. Nichts erfinden.
+- Keine erfundenen Straßennamen.
+- Hashtags wie #Stuttgart oder #Reutlingen als city werten.
+- "in Reutlingen", "bei Stuttgart", "Raum Karlsruhe" → city setzen.
+- Straßen IMMER als street extrahieren (z.B. Südstraße, Wilhelmstraße, Königstr.).
+- "Heilbronn Südstraße" oder "in Heilbronn Südstraße" → city: Heilbronn, street: Südstraße, locationType: address.
+- "an der Wilhelmstraße" in Reutlingen → city + street als ein address-Objekt.
+- Stadt und Straße nie in ein city-Feld zusammenfassen.
+- Fluss/Hochwasser: river setzen (z.B. Neckar, Rhein).
+- Autobahn: highway (z.B. A8, B27).
+- Wenn nur "Feuerwehr" ohne Ort: leeres Array [].
+- Wenn Bundesland genannt aber keine Stadt: state setzen, locationType state, confidence max 0.7.
+- Wenn Stadt in Baden-Württemberg plausibel: state "Baden-Württemberg", country "Deutschland".
+- Mehrere Orte im Text → mehrere Objekte.
+
+Text:
+"""
+{{TEXT}}
+"""

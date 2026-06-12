@@ -57,4 +57,39 @@ export const config = {
     /** Alert when level reaches this fraction of the next flood mark (0–1) */
     warningRatio: Number(process.env.PEGELONLINE_WARNING_RATIO) || 0.9,
   },
+
+  firms: {
+    enabled: process.env.FIRMS_ENABLED !== 'false',
+    apiBase:
+      process.env.FIRMS_API_BASE ||
+      'https://firms.modaps.eosdis.nasa.gov/api',
+    mapKey: process.env.FIRMS_MAP_KEY || '',
+    source: process.env.FIRMS_SOURCE || 'VIIRS_NOAA20_NRT',
+    dayRange: Number(process.env.FIRMS_DAY_RANGE) || 1,
+    /** Default 10 min — 1 API transaction per poll (FIRMS limit: 5000 / 10 min) */
+    pollIntervalMs: Number(process.env.FIRMS_POLL_INTERVAL_MS) || 600_000,
+    bbox: {
+      west: Number(process.env.FIRMS_BBOX_WEST) || 7.5,
+      south: Number(process.env.FIRMS_BBOX_SOUTH) || 47.4,
+      east: Number(process.env.FIRMS_BBOX_EAST) || 10.6,
+      north: Number(process.env.FIRMS_BBOX_NORTH) || 49.8,
+    },
+  },
+
+  geocoding: {
+    enabled: process.env.GEOCODING_ENABLED !== 'false',
+    llmBaseUrl:
+      process.env.GEOCODING_LLM_BASE_URL ||
+      'https://litellm-kommone.genai.govdigital.de/v1',
+    llmApiKey: process.env.GEOCODING_LLM_API_KEY || '',
+    llmModel:
+      process.env.GEOCODING_LLM_MODEL ||
+      'stackit-qwen-qwen3-vl-235b-a22b-instruct-fp8',
+    minConfidence: Number(process.env.GEOCODING_MIN_CONFIDENCE) || 0.6,
+    /** Only run LLM extraction on social sources; sensors use existing coords */
+    socialOnly: process.env.GEOCODING_SOCIAL_ONLY !== 'false',
+    nominatimBaseUrl:
+      process.env.NOMINATIM_BASE_URL || 'https://nominatim.openstreetmap.org',
+    bwOnly: process.env.GEOCODING_BW_ONLY !== 'false',
+  },
 } as const;

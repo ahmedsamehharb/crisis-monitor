@@ -12,7 +12,7 @@ Pick a module folder, implement the TODOs, export a service, and wire it in `ing
 | **Ingestion – Police** | `modules/ingestion/adapters/police/` | 🔲 Stub | _assign_ | Press release RSS |
 | **Ingestion – News** | `modules/ingestion/adapters/news/` | 🔲 Stub | _assign_ | Local news RSS |
 | **Normalization** | `modules/normalization/` | 🟡 Partial | _assign_ | Zod schemas, event type rules |
-| **Geocoding** | `modules/geocoding/` | 🔲 Stub | _assign_ | NER + geocode BW locations |
+| **Geocoding** | `modules/geocoding/` | ✅ Working | — | LiteLLM extraction + Nominatim; wired in ingestion |
 | **Correlation** | `modules/correlation/` | 🔲 Stub | _assign_ | Dedup + merge events |
 | **Scoring** | `modules/scoring/` | 🔲 Stub | _assign_ | Credibility, severity, triage |
 | **Summarization** | `modules/summarization/` | 🔲 Stub | _assign_ | LLM situational overview |
