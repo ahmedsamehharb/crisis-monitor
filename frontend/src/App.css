@@ -1,0 +1,56 @@
+.dashboard {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: system-ui, sans-serif;
+}
+
+header h1 {
+  margin: 0 0 0.25rem;
+}
+
+header p {
+  margin: 0 0 2rem;
+  color: #555;
+}
+
+.status-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  background: #fafafa;
+}
+
+.status-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.hint {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge--ok {
+  background: #d4edda;
+  color: #155724;
+}
+
+.badge--checking {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.badge--offline {
+  background: #f8d7da;
+  color: #721c24;
+}

@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Normalized crisis report after ingestion pipeline.
+/// TODO: extend fields as geocoding, scoring, and correlation modules land.
+model Report {
+  id              String   @id @default(cuid())
+  source          String
+  sourceId        String
+  rawText         String
+  url             String?
+  author          String?
+  createdAt       DateTime
+  ingestedAt      DateTime @default(now())
+  keywords        String[]
+  eventType       String?
+  latitude        Float?
+  longitude       Float?
+  locationLabel   String?
+  credibilityScore Float?
+  severityScore   Float?
+  summary         String?
+  processed       Boolean  @default(false)
+
+  @@unique([source, sourceId])
+  @@index([createdAt])
+  @@index([eventType])
+}
+
+model CrisisEvent {
+  id          String   @id @default(cuid())
+  title       String
+  eventType   String
+  status      String   @default("open")
+  latitude    Float?
+  longitude   Float?
+  summary     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reportIds   String[]
+
+  @@index([status])
+}
