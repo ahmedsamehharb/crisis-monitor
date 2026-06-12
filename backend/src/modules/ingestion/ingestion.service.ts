@@ -6,6 +6,7 @@ import type { IngestionAdapter } from './adapters/adapter.types.js';
 import { MastodonAdapter } from './adapters/mastodon/mastodon.adapter.js';
 import { BlueskyAdapter } from './adapters/bluesky/bluesky.adapter.js';
 import { PegelonlineAdapter } from './adapters/pegelonline/pegel.adapter.js';
+import { DwdAdapter } from './adapters/dwd/dwd.adapter.js';
 import { eventsService } from '../events/events.service.js';
 
 export class IngestionService {
@@ -26,8 +27,9 @@ export class IngestionService {
     if (config.pegelonline.enabled) {
       this.register(new PegelonlineAdapter());
     }
-    // Stub adapters — enable via config when implemented:
-    // this.register(new DwdAdapter());
+    if (config.dwd.enabled) {
+      this.register(new DwdAdapter());
+    }
   }
 
   start(): void {
@@ -77,6 +79,7 @@ function formatSourceLabel(source: string): string {
     mastodon: 'Mastodon',
     bluesky: 'Bluesky',
     pegelonline: 'PEGELONLINE',
+    dwd: 'DWD',
   };
   return labels[source] ?? source;
 }

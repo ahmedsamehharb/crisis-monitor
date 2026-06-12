@@ -27,6 +27,19 @@ export const config = {
     enabled: process.env.INGESTION_ENABLED !== 'false',
   },
 
+  dwd: {
+    enabled: process.env.DWD_ENABLED !== 'false',
+    pollIntervalMs: Number(process.env.DWD_POLL_INTERVAL_MS) || 600_000,
+    bwOnly: process.env.DWD_BW_ONLY !== 'false',
+    source: (process.env.DWD_SOURCE || 'auto') as 'auto' | 'json' | 'cap',
+    jsonUrl:
+      process.env.DWD_JSON_URL ||
+      'https://www.dwd.de/DWD/warnungen/warnapp/json/warnings.json',
+    capDiffUrl:
+      process.env.DWD_CAP_DIFF_URL ||
+      'https://opendata.dwd.de/weather/alerts/cap/DISTRICT_EVENT_DIFF/',
+  },
+
   pegelonline: {
     enabled: process.env.PEGELONLINE_ENABLED !== 'false',
     apiBase:
