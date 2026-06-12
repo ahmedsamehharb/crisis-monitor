@@ -3,14 +3,19 @@ import type { ReportScores } from './scoring.types.js';
 import { credibilityService } from './credibility.service.js';
 import { severityService } from './severity.service.js';
 
-/** TODO: rank reports for municipal triage dashboard */
+/** Rank reports for municipal triage dashboard */
 export class RankingService {
   scoreReport(report: IngestedReport): ReportScores {
+    const credibility =
+      report.trust ?? credibilityService.score(report);
+    const severity =
+      report.severity ?? severityService.score(report);
+
     return {
-      credibility: credibilityService.score(report),
-      severity: severityService.score(report),
-      urgency: severityService.score(report),
-      relevance: 0.5,
+      credibility,
+      severity,
+      urgency: severity,
+      relevance: credibility * 0.4 + severity * 0.6,
     };
   }
 }

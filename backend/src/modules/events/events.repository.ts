@@ -11,36 +11,45 @@ export class EventsRepository {
 
     if (!isDatabaseEnabled() || !prisma) return;
 
-    const latitude = num(report.metadata.latitude);
-    const longitude = num(report.metadata.longitude);
-    const locationLabel = str(report.metadata.locationLabel);
+    const latitude =
+      report.location?.lat ?? num(report.metadata.latitude);
+    const longitude =
+      report.location?.lon ?? num(report.metadata.longitude);
+    const locationLabel =
+      report.location?.municipality ??
+      report.location?.district ??
+      str(report.metadata.locationLabel);
 
     try {
       await prisma.report.upsert({
-      where: {
-        source_sourceId: { source: report.source, sourceId: report.sourceId },
-      },
-      create: {
-        source: report.source,
-        sourceId: report.sourceId,
-        rawText: report.rawText,
-        url: report.url,
-        author: report.author,
-        createdAt: new Date(report.createdAt),
-        keywords: report.keywords,
-        eventType: report.eventType,
-        latitude,
-        longitude,
-        locationLabel,
-      },
-      update: {
-        rawText: report.rawText,
-        keywords: report.keywords,
-        latitude,
-        longitude,
-        locationLabel,
-      },
-    });
+        where: {
+          source_sourceId: { source: report.source, sourceId: report.sourceId },
+        },
+        create: {
+          source: report.source,
+          sourceId: report.sourceId,
+          rawText: report.rawText,
+          url: report.url,
+          author: report.author,
+          createdAt: new Date(report.createdAt),
+          keywords: report.keywords,
+          eventType: report.eventType,
+          latitude,
+          longitude,
+          locationLabel,
+          credibilityScore: report.trust,
+          severityScore: report.severity,
+        },
+        update: {
+          rawText: report.rawText,
+          keywords: report.keywords,
+          latitude,
+          longitude,
+          locationLabel,
+          credibilityScore: report.trust,
+          severityScore: report.severity,
+        },
+      });
     } catch {
       // DB optional during hackathon — in-memory store remains authoritative
     }
@@ -52,29 +61,38 @@ export class EventsRepository {
     }
 
     try {
-    const rows = await prisma.report.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
+      const rows = await prisma.report.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
 
-    return rows.map((row) => ({
-      id: row.id,
-      source: row.source as IngestedReport['source'],
-      sourceId: row.sourceId,
-      rawText: row.rawText,
-      url: row.url || '',
-      author: row.author || '',
-      createdAt: row.createdAt.toISOString(),
-      ingestedAt: row.ingestedAt.toISOString(),
-      keywords: row.keywords,
-      eventType: (row.eventType as IngestedReport['eventType']) || 'unknown',
-      mediaUrls: [],
-      metadata: {
-        latitude: row.latitude ?? undefined,
-        longitude: row.longitude ?? undefined,
-        locationLabel: row.locationLabel ?? undefined,
-      },
-    }));
+      return rows.map((row) => ({
+        id: row.id,
+        source: row.source as IngestedReport['source'],
+        sourceId: row.sourceId,
+        rawText: row.rawText,
+        url: row.url || '',
+        author: row.author || '',
+        createdAt: row.createdAt.toISOString(),
+        ingestedAt: row.ingestedAt.toISOString(),
+        keywords: row.keywords,
+        eventType: (row.eventType as IngestedReport['eventType']) || 'unknown',
+        mediaUrls: [],
+        trust: row.credibilityScore ?? undefined,
+        severity: row.severityScore ?? undefined,
+        location: {
+          lat: row.latitude ?? undefined,
+          lon: row.longitude ?? undefined,
+          municipality: row.locationLabel ?? undefined,
+        },
+        metadata: {
+          latitude: row.latitude ?? undefined,
+          longitude: row.longitude ?? undefined,
+          locationLabel: row.locationLabel ?? undefined,
+          trust: row.credibilityScore ?? undefined,
+          severity: row.severityScore ?? undefined,
+        },
+      }));
     } catch {
       return this.memory.slice(0, limit);
     }

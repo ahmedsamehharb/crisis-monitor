@@ -1,7 +1,9 @@
 import { config } from '../../app/config/index.js';
 import { logCrisisMatch, logger } from '../../shared/logger/logger.js';
+import { geocodingService } from '../geocoding/geocoding.service.js';
 import { normalizerService } from '../normalization/normalizer.service.js';
 import type { IngestedReport } from '../normalization/report.types.js';
+import { reportScoringService } from '../scoring/report-scoring.service.js';
 import type { IngestionAdapter } from './adapters/adapter.types.js';
 import { MastodonAdapter } from './adapters/mastodon/mastodon.adapter.js';
 import { BlueskyAdapter } from './adapters/bluesky/bluesky.adapter.js';
@@ -9,7 +11,6 @@ import { PegelonlineAdapter } from './adapters/pegelonline/pegel.adapter.js';
 import { DwdAdapter } from './adapters/dwd/dwd.adapter.js';
 import { FirmsAdapter } from './adapters/fires/fires.adapter.js';
 import { eventsService } from '../events/events.service.js';
-import { geocodingService } from '../geocoding/geocoding.service.js';
 
 export class IngestionService {
   private adapters: IngestionAdapter[] = [];
@@ -61,29 +62,34 @@ export class IngestionService {
   }
 
   private async processReport(raw: IngestedReport): Promise<void> {
-    const report = normalizerService.normalize(raw);
-    if (!report) return;
+    const normalized = normalizerService.normalize(raw);
+    if (!normalized) return;
 
-    const enriched = await geocodingService.enrichReport(report);
-
-    const lat = enriched.metadata.latitude as number | undefined;
-    const lon = enriched.metadata.longitude as number | undefined;
-    const locationLabel = enriched.metadata.locationLabel as string | undefined;
+    const geocoded = await geocodingService.enrichReport(normalized);
+    const scored = reportScoringService.process(geocoded);
+    if (!scored) return;
 
     logCrisisMatch({
-      source: formatSourceLabel(enriched.source),
-      keywords: enriched.keywords,
-      author: enriched.author,
-      text: enriched.rawText,
-      url: enriched.url,
-      createdAt: enriched.createdAt,
+      source: formatSourceLabel(scored.source),
+      keywords: scored.keywords,
+      author: scored.author,
+      text: scored.rawText,
+      url: scored.url,
+      createdAt: scored.createdAt,
       location:
-        lat !== undefined && lon !== undefined
-          ? { label: locationLabel, latitude: lat, longitude: lon }
+        scored.location.lat !== undefined && scored.location.lon !== undefined
+          ? {
+              label:
+                scored.location.municipality ??
+                scored.location.district ??
+                (scored.metadata.locationLabel as string | undefined),
+              latitude: scored.location.lat,
+              longitude: scored.location.lon,
+            }
           : undefined,
     });
 
-    void eventsService.persistReport(enriched);
+    void eventsService.persistReport(scored);
   }
 
   listSources(): { id: string; label: string }[] {
