@@ -7,7 +7,7 @@ Pick a module folder, implement the TODOs, export a service, and wire it in `ing
 | **Ingestion – Mastodon** | `modules/ingestion/adapters/mastodon/` | ✅ Working | — | Keyword search polling |
 | **Ingestion – Bluesky** | `modules/ingestion/adapters/bluesky/` | ✅ Working | — | Keyword search polling |
 | **Ingestion – DWD** | `modules/ingestion/adapters/dwd/` | 🔲 Stub | _assign_ | Weather warnings CAP/API |
-| **Ingestion – Pegel** | `modules/ingestion/adapters/pegelonline/` | 🔲 Stub | _assign_ | River levels BW |
+| **Ingestion – Pegel** | `modules/ingestion/adapters/pegelonline/` | ✅ Working | — | River levels + flood marks (BW rivers) |
 | **Ingestion – HVZ** | `modules/ingestion/adapters/hvz/` | 🔲 Stub | _assign_ | Traffic / flood portals |
 | **Ingestion – Police** | `modules/ingestion/adapters/police/` | 🔲 Stub | _assign_ | Press release RSS |
 | **Ingestion – News** | `modules/ingestion/adapters/news/` | 🔲 Stub | _assign_ | Local news RSS |

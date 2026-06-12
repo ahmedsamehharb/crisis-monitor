@@ -26,4 +26,22 @@ export const config = {
   ingestion: {
     enabled: process.env.INGESTION_ENABLED !== 'false',
   },
+
+  pegelonline: {
+    enabled: process.env.PEGELONLINE_ENABLED !== 'false',
+    apiBase:
+      process.env.PEGELONLINE_API_BASE ||
+      'https://www.pegelonline.wsv.de/webservices/rest-api/v2',
+    pollIntervalMs: Number(process.env.PEGELONLINE_POLL_INTERVAL_MS) || 300000,
+    /** Rivers relevant to Baden-Württemberg flood monitoring */
+    waters: (
+      process.env.PEGELONLINE_WATERS ||
+      'NECKAR,RHEIN,DONAU,MAIN,KOCHER,ENZ,MURG,KINZIG,ILLER,TAUBER'
+    )
+      .split(',')
+      .map((w) => w.trim())
+      .filter(Boolean),
+    /** Alert when level reaches this fraction of the next flood mark (0–1) */
+    warningRatio: Number(process.env.PEGELONLINE_WARNING_RATIO) || 0.9,
+  },
 } as const;

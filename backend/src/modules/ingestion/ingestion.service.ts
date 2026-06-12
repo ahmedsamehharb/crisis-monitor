@@ -5,6 +5,7 @@ import type { IngestedReport } from '../normalization/report.types.js';
 import type { IngestionAdapter } from './adapters/adapter.types.js';
 import { MastodonAdapter } from './adapters/mastodon/mastodon.adapter.js';
 import { BlueskyAdapter } from './adapters/bluesky/bluesky.adapter.js';
+import { PegelonlineAdapter } from './adapters/pegelonline/pegel.adapter.js';
 import { eventsService } from '../events/events.service.js';
 
 export class IngestionService {
@@ -21,6 +22,9 @@ export class IngestionService {
     }
     if (config.bluesky.enabled) {
       this.register(new BlueskyAdapter());
+    }
+    if (config.pegelonline.enabled) {
+      this.register(new PegelonlineAdapter());
     }
     // Stub adapters — enable via config when implemented:
     // this.register(new DwdAdapter());
@@ -50,7 +54,7 @@ export class IngestionService {
     if (!report) return;
 
     logCrisisMatch({
-      source: report.source,
+      source: formatSourceLabel(report.source),
       keywords: report.keywords,
       author: report.author,
       text: report.rawText,
@@ -67,3 +71,12 @@ export class IngestionService {
 }
 
 export const ingestionService = new IngestionService();
+
+function formatSourceLabel(source: string): string {
+  const labels: Record<string, string> = {
+    mastodon: 'Mastodon',
+    bluesky: 'Bluesky',
+    pegelonline: 'PEGELONLINE',
+  };
+  return labels[source] ?? source;
+}
