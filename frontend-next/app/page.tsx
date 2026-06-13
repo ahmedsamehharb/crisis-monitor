@@ -1,12 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import dynamic from "next/dynamic";
 import EventDetail from "@/components/EventDetail";
 import QueueColumn from "@/components/QueueColumn";
 import Topbar from "@/components/Topbar";
 import { INITIAL_EVENTS, MOCK_NOW } from "@/data/events";
 import { fetchEvents } from "@/lib/api";
+import { mergeBaselineWithBackend } from "@/lib/merge-events";
+import {
+  applyDecisions,
+  loadDecisions,
+  mergeLocalStatus,
+  rememberDecision,
+  saveDecision,
+} from "@/lib/event-decisions";
 import type { Event as CwEvent, EventStatus } from "@/lib/types";
 import {
   clearUnreadFor,
@@ -18,9 +28,10 @@ import {
 } from "@/lib/unread";
 import { sortQueue } from "@/lib/ui";
 
-type DatenQuelle = "lädt" | "backend" | "mock";
+type DatenQuelle = "lädt" | "mock" | "hybrid";
 
-const POLL_MS = 30_000;
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const POLL_MS = DEMO_MODE ? 5_000 : 30_000;
 
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
@@ -31,18 +42,10 @@ const MapView = dynamic(() => import("@/components/MapView"), {
   ),
 });
 
-/** Bewertungsstatus aus vorherigem Stand beibehalten (lokal im Frontend). */
-function mergeLocalStatus(prev: CwEvent[], incoming: CwEvent[]): CwEvent[] {
-  const byId = new Map(
-    prev.map((e) => [e.id, { status: e.status, notiz: e.notiz, bewertetUm: e.bewertetUm }])
-  );
-  return incoming.map((e) => {
-    const kept = byId.get(e.id);
-    if (kept && kept.status !== "neu") {
-      return { ...e, status: kept.status, notiz: kept.notiz, bewertetUm: kept.bewertetUm };
-    }
-    return e;
-  });
+/** Bewertungsstatus aus React-State + sessionStorage auf Backend-Updates legen. */
+function mergeIncomingEvents(prev: CwEvent[], incoming: CwEvent[]): CwEvent[] {
+  const fromState = mergeLocalStatus(prev, incoming);
+  return applyDecisions(fromState, loadDecisions());
 }
 
 export default function Home() {
@@ -54,15 +57,29 @@ export default function Home() {
   const [mapMode, setMapMode] = useState<"event" | "alle">("alle");
   const [gemeinde, setGemeinde] = useState<string>("alle");
   const [sortBy, setSortBy] = useState<"urgency" | "confidence">("urgency");
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(true);
   const [nowIso, setNowIso] = useState<string>(MOCK_NOW);
   const [quelle, setQuelle] = useState<DatenQuelle>("lädt");
   const [unreadByEventId, setUnreadByEventId] = useState<UnreadMap>({});
   const hadBackendRef = useRef(false);
   const seenSignalsRef = useRef<SeenSignalCounts>({});
+  const { t } = useI18n();
   const baselineSeededRef = useRef(false);
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
+
+  useEffect(() => {
+    const stored = loadDecisions();
+    for (const e of INITIAL_EVENTS) {
+      if (e.status !== "neu" && !stored[e.id]) {
+        saveDecision(e.id, {
+          status: e.status,
+          notiz: e.notiz,
+          bewertetUm: e.bewertetUm,
+        });
+      }
+    }
+  }, []);
 
   const markSeen = useCallback((event: CwEvent | undefined) => {
     if (!event) return;
@@ -72,20 +89,14 @@ export default function Home() {
 
   const loadFromBackend = useCallback(async (signal: AbortSignal, isInitial: boolean) => {
     try {
-      const echte = await fetchEvents(signal);
+      const backendEvents = await fetchEvents(signal);
       if (signal.aborted) return;
 
-      if (echte.length === 0) {
-        if (!hadBackendRef.current) {
-          console.info("[codewehr] Backend erreichbar, 0 Events. Mock-Fallback bleibt aktiv.");
-          setQuelle("mock");
-        }
-        return;
-      }
-
       hadBackendRef.current = true;
+      const combined = mergeBaselineWithBackend(INITIAL_EVENTS, backendEvents);
+
       setEvents((prev) => {
-        const merged = mergeLocalStatus(prev, echte);
+        const merged = mergeIncomingEvents(prev, combined);
 
         if (!baselineSeededRef.current) {
           seenSignalsRef.current = seedSeenCounts(merged);
@@ -102,19 +113,28 @@ export default function Home() {
 
         return merged;
       });
-      setNowIso(new Date().toISOString());
-      setQuelle("backend");
+
+      setNowIso(
+        backendEvents.length > 0 ? new Date().toISOString() : MOCK_NOW
+      );
+      setQuelle(backendEvents.length > 0 ? "hybrid" : "mock");
 
       if (isInitial) {
         setSelectedId(
           (cur) =>
-            cur && echte.some((e) => e.id === cur)
+            cur && combined.some((e) => e.id === cur)
               ? cur
-              : sortQueue(echte.filter((e) => e.status === "neu"), "urgency")[0]?.id ?? ""
+              : sortQueue(combined.filter((e) => e.status === "neu"), "urgency")[0]?.id ?? ""
         );
       }
 
-      console.info(`[codewehr] ${echte.length} geclusterte(s) Event(s) vom Backend.`);
+      if (backendEvents.length > 0) {
+        console.info(
+          `[codewehr] ${backendEvents.length} Live-Event(s) mit ${INITIAL_EVENTS.length} Demo-Baseline zusammengeführt.`
+        );
+      } else {
+        console.info("[codewehr] Backend erreichbar, 0 Live-Events. Demo-Baseline aktiv.");
+      }
     } catch (err) {
       if (signal.aborted) return;
       if (!hadBackendRef.current) {
@@ -198,22 +218,23 @@ export default function Home() {
   const decide = useCallback(
     (id: string, status: EventStatus, notiz: string) => {
       setEvents((prev) =>
-        prev.map((e) =>
-          e.id === id
-            ? {
-                ...e,
-                status,
-                notiz: notiz.trim() === "" ? e.notiz : notiz.trim(),
-                bewertetUm:
-                  status === "bestaetigt" || status === "abgelehnt"
-                    ? new Date().toLocaleTimeString("de-DE", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : e.bewertetUm,
-              }
-            : e
-        )
+        prev.map((e) => {
+          if (e.id !== id) return e;
+          const updated: CwEvent = {
+            ...e,
+            status,
+            notiz: notiz.trim() === "" ? e.notiz : notiz.trim(),
+            bewertetUm:
+              status === "bestaetigt" || status === "abgelehnt"
+                ? new Date().toLocaleTimeString("de-DE", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : e.bewertetUm,
+          };
+          rememberDecision(updated);
+          return updated;
+        })
       );
       if (status === "bestaetigt" || status === "abgelehnt") {
         const next = [...eingang, ...onHold].find((e) => e.id !== id);
@@ -225,7 +246,12 @@ export default function Home() {
 
   const reopen = useCallback((id: string) => {
     setEvents((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, status: "neu", bewertetUm: undefined } : e))
+      prev.map((e) => {
+        if (e.id !== id) return e;
+        const updated = { ...e, status: "neu" as const, bewertetUm: undefined };
+        rememberDecision(updated);
+        return updated;
+      })
     );
   }, []);
 
@@ -233,6 +259,11 @@ export default function Home() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
+      if (e.key === "Escape" && detailOpen) {
+        e.preventDefault();
+        setDetailOpen(false);
+        return;
+      }
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
       e.preventDefault();
       const liste = [...eingang, ...onHold];
@@ -241,11 +272,11 @@ export default function Home() {
         e.key === "ArrowDown"
           ? liste[Math.min(idx + 1, liste.length - 1)]
           : liste[Math.max(idx - 1, 0)];
-      if (next) setSelectedId(next.id);
+      if (next) selectEvent(next.id);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [eingang, onHold, selectedId]);
+  }, [detailOpen, eingang, onHold, selectedId, selectEvent]);
 
   return (
     <main className="flex h-dvh flex-col">
@@ -255,39 +286,38 @@ export default function Home() {
         onGemeinde={setGemeinde}
         zaehler={{ offen: eingang.length, hold: onHold.length, bewertet: archive.length }}
       />
-      <div className="relative grid min-h-0 flex-1 grid-cols-[320px_1fr] xl:grid-cols-[320px_minmax(540px,1fr)_minmax(380px,520px)]">
-        <QueueColumn
-          eingang={eingang}
-          onHold={onHold}
-          archive={archive}
-          nowIso={nowIso}
-          selectedId={selectedId}
-          hoveredId={hoveredId}
-          unreadByEventId={unreadByEventId}
-          sortBy={sortBy}
-          onSortBy={setSortBy}
-          onSelect={selectEvent}
-          onHover={setHoveredId}
-        />
-        <div
-          className={`min-h-0 min-w-0 ${
-            detailOpen
-              ? "absolute inset-y-0 left-0 right-0 z-30 fade-in md:left-[320px] xl:static xl:z-auto"
-              : "hidden xl:block"
-          }`}
-        >
-          <EventDetail
-            key={selected?.id ?? "leer"}
-            event={selected}
-            isArchived={
-              !!selected && (selected.status === "bestaetigt" || selected.status === "abgelehnt")
-            }
+      <div className="relative grid min-h-0 flex-1 grid-cols-[320px_1fr]">
+        <div className="relative z-20 min-h-0 shadow-[4px_0_12px_rgba(0,0,0,0.35)]">
+          <QueueColumn
+            eingang={eingang}
+            onHold={onHold}
+            archive={archive}
             nowIso={nowIso}
-            onDecide={decide}
-            onReopen={reopen}
-            onClose={() => setDetailOpen(false)}
+            selectedId={selectedId}
+            hoveredId={hoveredId}
+            unreadByEventId={unreadByEventId}
+            sortBy={sortBy}
+            onSortBy={setSortBy}
+            onSelect={selectEvent}
+            onHover={setHoveredId}
           />
+          <button
+            type="button"
+            onClick={() => setDetailOpen((open) => !open)}
+            disabled={!selected}
+            aria-expanded={detailOpen}
+            aria-controls="cw-detail-drawer"
+            aria-label={detailOpen ? t("drawer.collapse") : t("drawer.expand")}
+            className="absolute -right-3 top-1/2 z-30 grid h-10 w-6 -translate-y-1/2 place-items-center rounded-r-md border border-line border-l-0 bg-panel text-mute shadow-md transition-colors hover:bg-card hover:text-ink disabled:pointer-events-none disabled:opacity-35"
+          >
+            {detailOpen ? (
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            ) : (
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            )}
+          </button>
         </div>
+
         <div className="min-h-0 min-w-0">
           <MapView
             events={mapEvents}
@@ -301,6 +331,29 @@ export default function Home() {
             onOpenDetail={() => setDetailOpen(true)}
           />
         </div>
+
+        <div
+          id="cw-detail-drawer"
+          role="complementary"
+          aria-label={t("drawer.aria")}
+          aria-hidden={!detailOpen}
+          className={`cw-detail-drawer absolute inset-y-0 z-10 flex w-[min(540px,45%)] flex-col border-r border-line bg-bg ${
+            detailOpen ? "is-open" : "is-closed"
+          }`}
+          style={{ left: 320 }}
+        >
+          <EventDetail
+            key={selected?.id ?? "leer"}
+            event={selected}
+            isArchived={
+              !!selected && (selected.status === "bestaetigt" || selected.status === "abgelehnt")
+            }
+            nowIso={nowIso}
+            onDecide={decide}
+            onReopen={reopen}
+            onClose={() => setDetailOpen(false)}
+          />
+        </div>
       </div>
       <div
         className="pointer-events-none absolute bottom-2 left-2 z-40 flex items-center gap-1.5 rounded-md border border-line bg-card/90 px-2 py-1 text-[10.5px] text-mute backdrop-blur"
@@ -308,14 +361,17 @@ export default function Home() {
       >
         <span
           className="h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: quelle === "backend" ? "#3FB36B" : "#9C9C9C" }}
+          style={{
+            backgroundColor:
+              quelle === "hybrid" ? "#3FB36B" : quelle === "mock" ? "#9C9C9C" : "#6d8db5",
+          }}
           aria-hidden
         />
         {quelle === "lädt"
-          ? "Datenquelle wird geladen ..."
-          : quelle === "backend"
-            ? "Echte Backend-Events (geclustert)"
-            : "Mock-Daten (Backend nicht erreichbar oder leer)"}
+          ? t("source.loading")
+          : quelle === "hybrid"
+            ? t("source.hybrid")
+            : t("source.mock")}
       </div>
     </main>
   );

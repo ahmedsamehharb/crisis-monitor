@@ -9,12 +9,12 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import type { Event as CwEvent } from "@/lib/types";
 import {
   SEV,
   TYPE_ICON,
-  fmtVor,
-  holdHinweis,
+  holdHintKey,
   minutenSeit,
   quellenStat,
   trendRichtung,
@@ -38,11 +38,6 @@ interface RowProps {
   onHover: (id: string | null) => void;
 }
 
-/**
- * Eine Zeilen-Anatomie für alle Bereiche: 3px-Severity-Kante links, Typ-Icon,
- * Titel, Subzeile, rechts genau ein Wert. Fake-Verdacht und On-Hold-Highlight
- * unterscheiden sich nur über Statuszeile und Kantenfarbe, nicht über die Form.
- */
 function EventRow({
   ev,
   bereich,
@@ -53,24 +48,24 @@ function EventRow({
   onSelect,
   onHover,
 }: RowProps) {
+  const { t, fmtAgo, holdHintLabel, plural, numberLocale } = useI18n();
   const Icon = ev.verdacht ? TriangleAlert : TYPE_ICON[ev.eventType];
-  const hinweis = bereich === "hold" ? holdHinweis(ev) : null;
+  const hintKey = bereich === "hold" ? holdHintKey(ev) : null;
+  const hinweis = hintKey ? holdHintLabel(hintKey) : null;
   const kante = ev.verdacht ? DANGER : hinweis ? WARNING : SEV[ev.urgency];
   const stat = quellenStat(ev);
 
   let subzeile: string;
   if (bereich === "archiv") {
-    subzeile = `${ev.bewertetUm ?? "--:--"} Uhr · ${
-      ev.status === "bestaetigt" ? "an Stab weitergegeben" : "verworfen"
+    subzeile = `${ev.bewertetUm ?? "--:--"}${t("time.oClock")} · ${
+      ev.status === "bestaetigt" ? t("queue.forwarded") : t("queue.discarded")
     }`;
   } else if (ev.verdacht) {
-    subzeile = `${ev.verdacht.kernwiderspruch} · ${ev.verdacht.shares.toLocaleString("de-DE")} Shares`;
+    subzeile = `${ev.verdacht.kernwiderspruch} · ${ev.verdacht.shares.toLocaleString(numberLocale)} Shares`;
   } else if (bereich === "hold") {
-    subzeile = `${stat.gesamt} Quellen · ${stat.typen} ${stat.typen === 1 ? "Typ" : "Typen"} · ${fmtVor(
-      ev.hold?.seitMin ?? minutenSeit(nowIso, ev.wann)
-    )}`;
+    subzeile = `${t("queue.sources", { count: stat.gesamt })} · ${plural("sourceTypes", stat.typen)} · ${fmtAgo(ev.hold?.seitMin ?? minutenSeit(nowIso, ev.wann))}`;
   } else {
-    subzeile = `${ev.ort.split(",")[0].trim()} · ${fmtVor(minutenSeit(nowIso, ev.wann))}`;
+    subzeile = `${ev.ort.split(",")[0].trim()} · ${fmtAgo(minutenSeit(nowIso, ev.wann))}`;
   }
 
   return (
@@ -99,7 +94,7 @@ function EventRow({
           ) : (
             <BellRing className="h-3 w-3" aria-hidden />
           )}
-          {ev.verdacht ? "Verdacht auf Falschmeldung" : hinweis}
+          {ev.verdacht ? t("queue.fakeAlert") : hinweis}
         </span>
       )}
 
@@ -115,24 +110,22 @@ function EventRow({
             <span className="block min-w-0 flex-1 truncate text-[13px] font-medium leading-tight text-ink">
               {ev.titel}
             </span>
-            {unreadCount > 0 && bereich !== "archiv" ? (
-              <UnreadDot count={unreadCount} />
-            ) : null}
+            {unreadCount > 0 ? <UnreadDot count={unreadCount} /> : null}
           </span>
           <span className="mt-0.5 block truncate text-[11px] text-mute">{subzeile}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {bereich === "archiv" ? (
             ev.status === "bestaetigt" ? (
-              <Check className="h-3.5 w-3.5" style={{ color: SUCCESS }} aria-label="An Stab weitergegeben" strokeWidth={2.4} />
+              <Check className="h-3.5 w-3.5" style={{ color: SUCCESS }} aria-label={t("queue.forwardedAria")} strokeWidth={2.4} />
             ) : (
-              <X className="h-3.5 w-3.5" style={{ color: "#9C9C9C" }} aria-label="Verworfen" strokeWidth={2.4} />
+              <X className="h-3.5 w-3.5" style={{ color: "#9C9C9C" }} aria-label={t("queue.discardedAria")} strokeWidth={2.4} />
             )
           ) : ev.verdacht ? (
             <>
               <TrendPfeil richtung="steigend" danger />
               <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: DANGER }}>
-                viral
+                {t("queue.viral")}
               </span>
             </>
           ) : bereich === "hold" ? (
@@ -196,6 +189,7 @@ export default function QueueColumn({
   onSelect,
   onHover,
 }: Props) {
+  const { t } = useI18n();
   const [archOpen, setArchOpen] = useState(false);
 
   const rowProps = (ev: CwEvent, bereich: Bereich) => ({
@@ -209,21 +203,21 @@ export default function QueueColumn({
     onHover,
   });
 
+  const sortMode = sortBy === "urgency" ? t("queue.sortByUrgency") : t("queue.sortByConfidence");
+
   return (
     <aside
-      aria-label="Meldungslisten"
+      aria-label={t("queue.aria")}
       className="flex h-full min-h-0 flex-col overflow-y-auto border-r border-line bg-panel"
     >
-      <SectionHeader label="Eingang" count={eingang.length}>
+      <SectionHeader label={t("queue.inbox")} count={eingang.length}>
         <button
           type="button"
           onClick={() => onSortBy(sortBy === "urgency" ? "confidence" : "urgency")}
           className="flex items-center gap-1 text-[11px] text-mute hover:text-ink"
-          aria-label={`Sortierung wechseln, aktuell nach ${
-            sortBy === "urgency" ? "Dringlichkeit" : "Konfidenz"
-          }`}
+          aria-label={t("queue.sortSwitch", { mode: sortMode })}
         >
-          {sortBy === "urgency" ? "Nach Dringlichkeit" : "Nach Konfidenz"}
+          {sortMode}
           <ArrowUpDown className="h-3 w-3" aria-hidden />
         </button>
       </SectionHeader>
@@ -232,17 +226,17 @@ export default function QueueColumn({
           <EventRow key={ev.id} {...rowProps(ev, "eingang")} />
         ))}
         {eingang.length === 0 && (
-          <p className="px-4 py-4 text-xs text-dim">Keine offenen Meldungen im Eingang.</p>
+          <p className="px-4 py-4 text-xs text-dim">{t("queue.emptyInbox")}</p>
         )}
       </div>
 
-      <SectionHeader label="On Hold" count={onHold.length} />
+      <SectionHeader label={t("queue.onHold")} count={onHold.length} />
       <div>
         {onHold.map((ev) => (
           <EventRow key={ev.id} {...rowProps(ev, "hold")} />
         ))}
         {onHold.length === 0 && (
-          <p className="px-4 py-4 text-xs text-dim">Keine Meldungen on hold.</p>
+          <p className="px-4 py-4 text-xs text-dim">{t("queue.emptyHold")}</p>
         )}
       </div>
 
@@ -254,7 +248,7 @@ export default function QueueColumn({
       >
         <span className="flex items-baseline gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-mute">
-            Bereits bewertet
+            {t("queue.archive")}
           </span>
           <span className="text-[11px] font-semibold text-ink">{archive.length}</span>
         </span>
@@ -269,7 +263,7 @@ export default function QueueColumn({
             <EventRow key={ev.id} {...rowProps(ev, "archiv")} />
           ))}
           {archive.length === 0 && (
-            <p className="px-4 py-2 text-xs text-dim">Noch keine Bewertungen.</p>
+            <p className="px-4 py-2 text-xs text-dim">{t("queue.emptyArchive")}</p>
           )}
         </div>
       )}

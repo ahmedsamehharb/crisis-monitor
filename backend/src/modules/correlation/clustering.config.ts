@@ -55,6 +55,10 @@ export const clusteringConfig = {
   trustBoostPerSourceCategory:
     Number(process.env.CLUSTER_TRUST_BOOST_PER_CATEGORY) || 0.08,
 
+  /** Trust boost per additional merged signal on the same event (beyond the first) */
+  trustBoostPerSignal:
+    Number(process.env.CLUSTER_TRUST_BOOST_PER_SIGNAL) || 0.05,
+
   /** Max open events to consider as merge candidates per incoming report */
   maxCandidates: Number(process.env.CLUSTER_MAX_CANDIDATES) || 50,
 } as const;

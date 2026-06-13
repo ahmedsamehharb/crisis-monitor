@@ -123,6 +123,8 @@ export const AMTLICHE_VERIFIZIERER: readonly BackendSource[] = [
 ];
 
 export const DEFAULT_CONFIDENCE = 0.5;
+/** Mirrors backend CLUSTER_TRUST_BOOST_PER_SIGNAL */
+export const TRUST_BOOST_PER_SIGNAL = 0.05;
 export const CLUSTER_ZEITFENSTER_MIN = 90;
 export const BW_CENTER = { lat: 48.6616, lon: 9.3501 };
 
@@ -324,6 +326,15 @@ function quellentypZahl(belege: CwEvent["belege"]): number {
   return [belege.social, belege.wetter, belege.amtlich].filter(Boolean).length;
 }
 
+/** Client-side rollup when backend credibilityScore is unavailable (legacy /reports path). */
+function computeEventConfidence(reports: BackendReport[]): number {
+  if (reports.length === 0) return DEFAULT_CONFIDENCE;
+  const avgTrust =
+    reports.reduce((sum, r) => sum + reportTrust(r), 0) / reports.length;
+  const signalBoost = Math.max(0, reports.length - 1) * TRUST_BOOST_PER_SIGNAL;
+  return clamp01(avgTrust + signalBoost);
+}
+
 function buildUrteil(
   reports: BackendReport[],
   ort: string,
@@ -377,7 +388,7 @@ function buildEventFromSignals(
     "Ort unbekannt";
 
   const belege = buildBelege(sorted);
-  const confidence = rollup?.credibilityScore ?? Math.max(...sorted.map(reportTrust), 0);
+  const confidence = rollup?.credibilityScore ?? computeEventConfidence(sorted);
   const severity = rollup?.severityScore ?? Math.max(...sorted.map(reportSeverity), 0);
   const urgency = severityToUrgency(severity);
   const verifiziert = istVerifiziert(sorted);

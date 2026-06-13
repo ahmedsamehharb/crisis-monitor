@@ -54,36 +54,102 @@ body {
   animation: cwFadeIn 0.25s ease;
 }
 
-/* Karten-Pins: das Wurzel-Element positioniert MapLibre per transform,
-   skaliert wird deshalb nur der innere Button */
-.cw-pin {
+/* Karten-Pins: MapLibre transformiert nur den äußeren Marker, Animationen im Inneren */
+.cw-pin-marker {
+  overflow: visible !important;
+}
+
+.cw-pin-wrap {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 96px;
+  height: 96px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.cw-pin-wrap > .cw-pin {
+  pointer-events: auto;
+}
+
+/* Dauerhafter weicher Glow (statisch) */
+.cw-pin-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin-left: -26px;
+  margin-top: -26px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--pin, #6d8db5) 55%, transparent) 0%,
+    color-mix(in srgb, var(--pin, #6d8db5) 22%, transparent) 45%,
+    transparent 72%
+  );
+  pointer-events: none;
+  z-index: 0;
+  will-change: width, height, opacity;
+}
+
+/* Ripple-Ring — Größe/Opacity per JS-Animation (map-pin-animation.ts) */
+.cw-pin-pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 38px;
+  height: 38px;
+  margin-left: -19px;
+  margin-top: -19px;
+  border-radius: 9999px;
+  border: 2px solid var(--pin, #6d8db5);
+  background: transparent;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--pin, #6d8db5) 55%, transparent);
+  pointer-events: none;
+  z-index: 1;
+  box-sizing: border-box;
+  will-change: width, height, opacity;
+}
+
+.cw-pin-wrap.is-active-wrap .cw-pin-pulse {
+  border-width: 2.5px;
+}
+
+.cw-pin {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
   border-radius: 9999px;
   background: var(--pin, #6d8db5);
   color: #141414;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  border: 2.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--pin, #6d8db5) 70%, transparent),
+    0 0 32px color-mix(in srgb, var(--pin, #6d8db5) 35%, transparent),
+    0 6px 18px rgba(0, 0, 0, 0.45);
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 .cw-pin svg {
   width: 16px;
   height: 16px;
 }
 .cw-pin.is-hover {
-  transform: scale(1.12);
+  transform: scale(1.1) !important;
 }
 .cw-pin.is-active {
-  transform: scale(1.28);
-  box-shadow:
-    0 0 0 6px color-mix(in srgb, var(--pin) 30%, transparent),
-    0 8px 22px rgba(0, 0, 0, 0.5);
+  transform: scale(1.14) !important;
 }
 .cw-pin.is-dim {
   opacity: 0.45;
+}
+.cw-pin-wrap:has(.cw-pin.is-dim) .cw-pin-pulse,
+.cw-pin-wrap:has(.cw-pin.is-dim) .cw-pin-glow {
+  display: none;
 }
 .cw-pin.is-verdacht {
   border: 1.5px dashed rgba(245, 245, 245, 0.6);
@@ -122,6 +188,14 @@ body {
   outline: none;
 }
 
+.maplibregl-marker {
+  overflow: visible !important;
+}
+
+.cw-pin-marker.maplibregl-marker {
+  overflow: visible !important;
+}
+
 /* Ungelesene neue Signale an einem Event (Queue + Karte) */
 @keyframes cwUnreadPulse {
   0%,
@@ -153,16 +227,10 @@ body {
   border-width: 2px;
 }
 
-.cw-pin-wrap {
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-
 .cw-pin-unread {
   position: absolute;
-  top: -1px;
-  right: -1px;
+  top: calc(50% - 19px - 2px);
+  right: calc(50% - 19px - 2px);
   z-index: 2;
   width: 10px;
   height: 10px;
@@ -172,4 +240,17 @@ body {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent);
   animation: cwUnreadPulse 2.4s ease-in-out infinite;
   pointer-events: none;
+}
+
+/* Entscheidungsansicht: nach links unter die Meldungsleiste schieben */
+.cw-detail-drawer {
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+.cw-detail-drawer.is-closed {
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+.cw-detail-drawer.is-open {
+  transform: translateX(0);
 }

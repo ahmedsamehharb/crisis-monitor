@@ -111,6 +111,21 @@ function buildSummary(reports: ScoredReport[]): string {
   return `${reports.length} signal(s) from ${sources.length} source(s): ${sources.join(', ')}`;
 }
 
+/** Event credibility: avg signal trust + multi-category + corroboration from signal count */
+function computeCredibilityScore(
+  reports: ScoredReport[],
+  sources: DataSourceId[]
+): number {
+  const avgTrust =
+    reports.reduce((sum, r) => sum + (r.trust ?? 0), 0) / reports.length;
+  const categoryBoost =
+    (sourceCategories(sources) - 1) * clusteringConfig.trustBoostPerSourceCategory;
+  const signalBoost =
+    Math.max(0, reports.length - 1) * clusteringConfig.trustBoostPerSignal;
+
+  return Math.min(1, avgTrust + Math.max(0, categoryBoost) + signalBoost);
+}
+
 /** Recompute event rollups from all member reports */
 export class EventMergerService {
   createFromReport(report: ScoredReport, eventId: string): CrisisEventAggregate {
@@ -131,11 +146,7 @@ export class EventMergerService {
     const sources = uniqueSources(sorted);
 
     const maxSeverity = Math.max(...sorted.map((r) => r.severity ?? 0));
-    const avgTrust =
-      sorted.reduce((sum, r) => sum + (r.trust ?? 0), 0) / sorted.length;
-    const categoryBoost =
-      (sourceCategories(sources) - 1) * clusteringConfig.trustBoostPerSourceCategory;
-    const credibilityScore = Math.min(1, avgTrust + Math.max(0, categoryBoost));
+    const credibilityScore = computeCredibilityScore(sorted, sources);
 
     const firstDetectedAt = sorted[0]?.createdAt ?? new Date().toISOString();
     const lastUpdatedAt =

@@ -5,8 +5,10 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Minus, Plus } from "lucide-react";
 import type { Event as CwEvent, EventType } from "@/lib/types";
-import { SEV, URGENCY_LABEL, konfidenzStufe, signalPoints } from "@/lib/ui";
-import { Chip } from "./ui";
+import { SEV, signalPoints } from "@/lib/ui";
+import { startPinAnimations } from "@/lib/map-pin-animation";
+import { useI18n } from "@/lib/i18n/I18nProvider";
+import { Chip, KonfidenzText } from "./ui";
 
 const VERDACHT_ICON =
   '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>';
@@ -37,6 +39,7 @@ type MarkerEntry = {
   el: HTMLElement;
   root?: HTMLElement;
   isEvent: boolean;
+  stopAnimations?: () => void;
 };
 
 interface Props {
@@ -62,8 +65,11 @@ export default function MapView({
   onHover,
   onOpenDetail,
 }: Props) {
+  const { t, urgencyLabel } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<MarkerEntry[]>([]);
+  const pinSignatureRef = useRef("");
+  const markersMapRef = useRef<maplibregl.Map | null>(null);
   const [mapInst, setMapInst] = useState<maplibregl.Map | null>(null);
   const [popoverId, setPopoverId] = useState<string | null>(null);
   const [popPos, setPopPos] = useState<{ x: number; y: number } | null>(null);
@@ -91,10 +97,43 @@ export default function MapView({
     };
   }, []);
 
-  // Marker auf- und abbauen, abhängig von Modus, Events und aktivem Event
+  const pinSignature = useMemo(() => {
+    const pins = mode === "event" && active ? [active] : events;
+    return pins
+      .map(
+        (e) =>
+          `${e.id}:${e.lat.toFixed(5)}:${e.lon.toFixed(5)}:${e.urgency}:${e.verdacht ? 1 : 0}:${e.status}`
+      )
+      .join("|");
+  }, [events, mode, active]);
+
+  // Marker auf- und abbauen (nur wenn sich Pin-Positionen/Status ändern, nicht bei jedem Poll)
   useEffect(() => {
     if (!mapInst) return;
-    markersRef.current.forEach((m) => m.marker.remove());
+    if (
+      pinSignature === pinSignatureRef.current &&
+      markersRef.current.length > 0 &&
+      markersMapRef.current === mapInst
+    ) {
+      markersRef.current.forEach((m) => {
+        if (!m.isEvent || !m.root || m.stopAnimations) return;
+        const pin = m.el;
+        if (pin.classList.contains("is-dim")) return;
+        const glowEl = m.root.querySelector<HTMLElement>(".cw-pin-glow");
+        const pulseEls = [...m.root.querySelectorAll<HTMLElement>(".cw-pin-pulse")];
+        if (glowEl && pulseEls.length) {
+          m.stopAnimations = startPinAnimations(glowEl, pulseEls, pin);
+        }
+      });
+      return;
+    }
+    pinSignatureRef.current = pinSignature;
+    markersMapRef.current = mapInst;
+
+    markersRef.current.forEach((m) => {
+      m.stopAnimations?.();
+      m.marker.remove();
+    });
     markersRef.current = [];
 
     if (mode === "event" && active) {
@@ -115,14 +154,31 @@ export default function MapView({
 
     const pins = mode === "event" && active ? [active] : events;
     pins.forEach((ev) => {
+      const pinColor = ev.verdacht ? "#E5484D" : SEV[ev.urgency];
+      const outer = document.createElement("div");
+      outer.className = "cw-pin-marker";
+
       const root = document.createElement("div");
       root.className = "cw-pin-wrap";
+      root.style.setProperty("--pin", pinColor);
+
+      const glow = document.createElement("span");
+      glow.className = "cw-pin-glow";
+      glow.setAttribute("aria-hidden", "true");
+
+      const pulse2 = document.createElement("span");
+      pulse2.className = "cw-pin-pulse cw-pin-pulse-delay";
+      pulse2.setAttribute("aria-hidden", "true");
+
+      const pulse = document.createElement("span");
+      pulse.className = "cw-pin-pulse";
+      pulse.setAttribute("aria-hidden", "true");
+
       const el = document.createElement("button");
       el.type = "button";
       el.className = "cw-pin";
       if (ev.status === "bestaetigt" || ev.status === "abgelehnt") el.classList.add("is-dim");
       if (ev.verdacht) el.classList.add("is-verdacht");
-      el.style.setProperty("--pin", ev.verdacht ? "#E5484D" : SEV[ev.urgency]);
       el.setAttribute("aria-label", ev.verdacht ? `Verdacht auf Falschmeldung: ${ev.titel}` : ev.titel);
       el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${
         ev.verdacht ? VERDACHT_ICON : ICON_SVG[ev.eventType]
@@ -134,19 +190,59 @@ export default function MapView({
       });
       el.addEventListener("mouseenter", () => cbRef.current.onHover(ev.id));
       el.addEventListener("mouseleave", () => cbRef.current.onHover(null));
+      root.appendChild(glow);
+      root.appendChild(pulse);
+      root.appendChild(pulse2);
       root.appendChild(el);
-      if ((unreadByEventId[ev.id] ?? 0) > 0) {
-        const dot = document.createElement("span");
-        dot.className = "cw-pin-unread";
-        dot.setAttribute("aria-hidden", "true");
-        root.appendChild(dot);
-      }
-      const marker = new maplibregl.Marker({ element: root, anchor: "center" })
+      outer.appendChild(root);
+      const marker = new maplibregl.Marker({ element: outer, anchor: "center" })
         .setLngLat([ev.lon, ev.lat])
         .addTo(mapInst);
-      markersRef.current.push({ id: ev.id, marker, el, root, isEvent: true });
+
+      const dimmed = ev.status === "bestaetigt" || ev.status === "abgelehnt";
+      const entry: MarkerEntry = {
+        id: ev.id,
+        marker,
+        el,
+        root,
+        isEvent: true,
+      };
+      markersRef.current.push(entry);
+
+      if (!dimmed) {
+        entry.stopAnimations = startPinAnimations(glow, [pulse, pulse2], el);
+      }
     });
-  }, [mapInst, events, mode, active, unreadByEventId]);
+
+    return () => {
+      markersRef.current.forEach((m) => {
+        m.stopAnimations?.();
+        m.marker.remove();
+      });
+      markersRef.current = [];
+      pinSignatureRef.current = "";
+      markersMapRef.current = null;
+    };
+  }, [mapInst, mode, active?.id, pinSignature]);
+
+  // Unread-Badges ohne Marker-Neuaufbau
+  useEffect(() => {
+    markersRef.current.forEach((m) => {
+      if (!m.isEvent || !m.root) return;
+      const count = unreadByEventId[m.id] ?? 0;
+      let dot = m.root.querySelector<HTMLElement>(".cw-pin-unread");
+      if (count > 0) {
+        if (!dot) {
+          dot = document.createElement("span");
+          dot.className = "cw-pin-unread";
+          dot.setAttribute("aria-hidden", "true");
+          m.root.appendChild(dot);
+        }
+      } else if (dot) {
+        dot.remove();
+      }
+    });
+  }, [unreadByEventId]);
 
   // Verknüpfte Markierung: aktiv und Hover auf den Pins spiegeln
   useEffect(() => {
@@ -156,9 +252,12 @@ export default function MapView({
       const isHover = hoveredId === m.id && !isActive;
       m.el.classList.toggle("is-active", isActive);
       m.el.classList.toggle("is-hover", isHover);
-      if (m.root) m.root.style.zIndex = isActive ? "30" : isHover ? "20" : "10";
+      if (m.root) {
+        m.root.classList.toggle("is-active-wrap", isActive);
+        m.root.style.zIndex = isActive ? "30" : isHover ? "20" : "10";
+      }
     });
-  }, [hoveredId, active, mode, events, mapInst]);
+  }, [hoveredId, active?.id]);
 
   // Kamera folgt dem aktiven Event
   useEffect(() => {
@@ -230,7 +329,7 @@ export default function MapView({
 
   return (
     <section
-      aria-label="Lagekarte"
+      aria-label={t("map.aria")}
       className="relative isolate h-full min-h-0 overflow-hidden bg-panel"
     >
       {/* h-full/w-full statt nur inset-0: MapLibres Stylesheet setzt position:relative auf den Container */}
@@ -244,7 +343,7 @@ export default function MapView({
           aria-pressed={mode === "event"}
           className={modeBtn(mode === "event")}
         >
-          Nur dieses Event
+          {t("map.thisEvent")}
         </button>
         <button
           type="button"
@@ -252,14 +351,14 @@ export default function MapView({
           aria-pressed={mode === "alle"}
           className={modeBtn(mode === "alle")}
         >
-          Alle Lagen
+          {t("map.allEvents")}
         </button>
       </div>
 
       <div className="absolute right-3 top-3 z-20 flex flex-col gap-2">
         <button
           type="button"
-          aria-label="Hineinzoomen"
+          aria-label={t("map.zoomIn")}
           onClick={() => mapInst?.zoomIn()}
           className="grid h-9 w-9 place-items-center rounded-full border border-line bg-panel/90 text-ink backdrop-blur hover:bg-card"
         >
@@ -267,7 +366,7 @@ export default function MapView({
         </button>
         <button
           type="button"
-          aria-label="Herauszoomen"
+          aria-label={t("map.zoomOut")}
           onClick={() => mapInst?.zoomOut()}
           className="grid h-9 w-9 place-items-center rounded-full border border-line bg-panel/90 text-ink backdrop-blur hover:bg-card"
         >
@@ -279,25 +378,25 @@ export default function MapView({
         <div className="absolute bottom-3 left-3 z-20 max-w-[280px] rounded-lg border border-line bg-bg/90 p-3 backdrop-blur">
           <p className="text-xs font-bold">
             {sigCounts.total >= 2
-              ? `Signalbild räumlich konsistent · ${sigCounts.total} Signale`
-              : "Einzelsignal · keine räumliche Bestätigung"}
+              ? t("map.spatialConsistent", { count: sigCounts.total })
+              : t("map.singleSignal")}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {sigCounts.social > 0 && (
               <Chip>
-                <span className="h-2 w-2 rounded-full bg-[#9C9C9C]" aria-hidden /> Social{" "}
+                <span className="h-2 w-2 rounded-full bg-[#9C9C9C]" aria-hidden /> {t("map.social")}{" "}
                 {sigCounts.social}
               </Chip>
             )}
             {sigCounts.wetter > 0 && (
               <Chip>
-                <span className="h-2 w-2 rounded-[1px] bg-[#6D8DB5]" aria-hidden /> Wetter{" "}
+                <span className="h-2 w-2 rounded-[1px] bg-[#6D8DB5]" aria-hidden /> {t("map.weather")}{" "}
                 {sigCounts.wetter}
               </Chip>
             )}
             {sigCounts.amtlich > 0 && (
               <Chip>
-                <span className="h-2 w-2 rotate-45 rounded-[1px] bg-[#3FB36B]" aria-hidden /> Amtlich{" "}
+                <span className="h-2 w-2 rotate-45 rounded-[1px] bg-[#3FB36B]" aria-hidden /> {t("map.official")}{" "}
                 {sigCounts.amtlich}
               </Chip>
             )}
@@ -317,16 +416,16 @@ export default function MapView({
           <div className="w-60 rounded-lg border border-line bg-panel/95 p-3 shadow-2xl shadow-black/50 backdrop-blur">
             <p className="text-sm font-bold leading-snug">{popEvent.titel}</p>
             <p className="mt-0.5 text-[11px] text-mute">{popEvent.ort}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <Chip>
                 <span
                   className="h-2 w-2 rounded-full"
                   style={{ backgroundColor: SEV[popEvent.urgency] }}
                   aria-hidden
                 />
-                Stufe {popEvent.urgency} · {URGENCY_LABEL[popEvent.urgency]}
+                {t("map.level", { level: popEvent.urgency, label: urgencyLabel(popEvent.urgency) })}
               </Chip>
-              <Chip>Konfidenz {konfidenzStufe(popEvent.confidence)}</Chip>
+              <KonfidenzText value={popEvent.confidence} verified={popEvent.verifiziert} />
             </div>
             <button
               type="button"
@@ -336,7 +435,7 @@ export default function MapView({
               }}
               className="mt-3 w-full rounded-md border border-accent/50 bg-accent/10 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
             >
-              Im Detail öffnen
+              {t("map.openDetail")}
             </button>
           </div>
         </div>

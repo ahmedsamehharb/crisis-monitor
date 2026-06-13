@@ -17,10 +17,10 @@ import {
   X,
 } from "lucide-react";
 import type { Event as CwEvent, EventStatus } from "@/lib/types";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import {
   SEV,
   TYPE_ICON,
-  fmtVor,
   konfidenzStufe,
   minutenSeit,
   quellenStat,
@@ -120,17 +120,18 @@ function DecisionBar({
   onDecide: Props["onDecide"];
   onReopen: Props["onReopen"];
 }) {
+  const { t, fmtAgo, confidenceLabel } = useI18n();
   const [notiz, setNotiz] = useState("");
 
   if (isArchived) {
     const positiv = event.status === "bestaetigt";
     const ergebnis = event.verdacht
       ? positiv
-        ? "Richtigstellung angestoßen"
-        : "Entwarnt, kein Fake"
+        ? t("detail.resultCorrect")
+        : t("detail.resultNoFake")
       : positiv
-        ? "An Stab weitergegeben"
-        : "Verworfen";
+        ? t("detail.resultForward")
+        : t("detail.resultDiscard");
     const c = positiv === !event.verdacht ? SUCCESS : positiv ? DANGER : "#9C9C9C";
     return (
       <div className="space-y-3 border-t border-line bg-panel p-4">
@@ -146,7 +147,7 @@ function DecisionBar({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-ink">{ergebnis}</p>
             <p className="text-[11.5px] text-mute">
-              {event.bewertetUm ? `${event.bewertetUm} Uhr · ` : ""}S. Lindner (S2) · protokolliert
+              {event.bewertetUm ? `${event.bewertetUm}${t("time.oClock")} · ` : ""}S. Lindner (S2) · {t("detail.logged")}
             </p>
           </div>
           <KonfidenzPill value={event.confidence} verified={event.verifiziert} />
@@ -154,7 +155,7 @@ function DecisionBar({
         {event.notiz && (
           <div className="rounded-lg border border-line px-3.5 py-2.5">
             <div className="mb-1 text-[9.5px] font-semibold uppercase tracking-wider text-dim">
-              Notiz
+              {t("detail.note")}
             </div>
             <p className="text-xs leading-relaxed text-ink">{event.notiz}</p>
           </div>
@@ -164,14 +165,14 @@ function DecisionBar({
           onClick={() => onReopen(event.id)}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-accent/50 bg-accent/10 py-2.5 text-xs font-semibold text-accent transition-colors hover:bg-accent/20"
         >
-          <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Erneut bewerten
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden /> {t("detail.reopen")}
         </button>
       </div>
     );
   }
 
   const fake = !!event.verdacht;
-  const holdLabel = event.status === "hold" ? "Weiter beobachten" : "On hold";
+  const holdLabel = event.status === "hold" ? t("detail.actionObserve") : t("detail.actionOnHold");
 
   return (
     <div className="space-y-3 border-t border-line bg-panel p-4">
@@ -180,9 +181,9 @@ function DecisionBar({
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
           <p className="text-xs leading-relaxed text-soft">
             <span className="font-semibold text-ink">
-              Für eine Eskalation fehlt noch: {event.urteil.fehlt}.
+              {t("detail.escalateMissing", { item: event.urteil.fehlt })}
             </span>{" "}
-            On hold holt den Fall automatisch zurück, sobald Neues eintrifft.
+            {t("detail.escalateHoldHint")}
           </p>
         </div>
       )}
@@ -194,21 +195,21 @@ function DecisionBar({
               onClick={() => onDecide(event.id, "bestaetigt", notiz)}
               icon={<Megaphone className="h-3.5 w-3.5" aria-hidden />}
             >
-              Richtigstellung anstoßen
+              {t("detail.actionCorrect")}
             </AktionButton>
             <AktionButton
               tone="neutral"
               onClick={() => onDecide(event.id, "hold", notiz)}
               icon={<Eye className="h-3.5 w-3.5" aria-hidden />}
             >
-              Weiter beobachten
+              {t("detail.actionObserve")}
             </AktionButton>
             <AktionButton
               tone="success"
               onClick={() => onDecide(event.id, "abgelehnt", notiz)}
               icon={<Check className="h-3.5 w-3.5" aria-hidden />}
             >
-              Kein Fake · entwarnen
+              {t("detail.actionNoFake")}
             </AktionButton>
           </>
         ) : (
@@ -218,7 +219,7 @@ function DecisionBar({
               onClick={() => onDecide(event.id, "bestaetigt", notiz)}
               icon={<ArrowRight className="h-3.5 w-3.5" aria-hidden />}
             >
-              An Stab weitergeben
+              {t("detail.actionForward")}
             </AktionButton>
             <AktionButton
               tone="neutral"
@@ -232,7 +233,7 @@ function DecisionBar({
               onClick={() => onDecide(event.id, "abgelehnt", notiz)}
               icon={<X className="h-3.5 w-3.5" aria-hidden />}
             >
-              Verwerfen
+              {t("detail.actionDiscard")}
             </AktionButton>
           </>
         )}
@@ -241,13 +242,13 @@ function DecisionBar({
         value={notiz}
         onChange={(e) => setNotiz(e.target.value)}
         rows={2}
-        placeholder="Notiz zur Entscheidung (wird protokolliert) ..."
-        aria-label="Notiz zur Entscheidung"
+        placeholder={t("detail.notePlaceholder")}
+        aria-label={t("detail.noteLabel")}
         className="w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-xs text-ink placeholder:text-dim focus:border-accent/60 focus:outline-none"
       />
       <p className="flex items-center gap-1.5 text-[10.5px] text-dim">
         <ShieldCheck className="h-3 w-3 shrink-0" aria-hidden />
-        Die KI belegt. Die Entscheidung trifft der Mensch und wird protokolliert.
+        {t("detail.aiDisclaimer")}
       </p>
     </div>
   );
@@ -261,12 +262,13 @@ export default function EventDetail({
   onReopen,
   onClose,
 }: Props) {
+  const { t, fmtAgo, confidenceLabel, eventTypeLabel, numberLocale } = useI18n();
   const [belegeOpen, setBelegeOpen] = useState(false);
 
   if (!event) {
     return (
       <section className="flex h-full items-center justify-center border-r border-line bg-bg p-6 text-center text-sm text-mute">
-        Kein Fall geöffnet. Wähle eine Meldung aus der Liste.
+        {t("detail.empty")}
       </section>
     );
   }
@@ -276,13 +278,13 @@ export default function EventDetail({
   const sev = SEV[event.urgency];
   const stat = quellenStat(event);
   const erstPost = event.belege.social?.posts[0];
-  const vorMin = fmtVor(minutenSeit(nowIso, event.wann));
+  const vorMin = fmtAgo(minutenSeit(nowIso, event.wann));
   const trendVorher = event.hold ? konfidenzStufe(event.hold.konfidenzVorher) : null;
   const trendJetzt = konfidenzStufe(event.confidence);
 
   return (
     <section
-      aria-label="Entscheidungsansicht"
+      aria-label={t("detail.aria")}
       className="flex h-full min-h-0 flex-col overflow-hidden border-r border-line bg-bg"
     >
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
@@ -291,7 +293,7 @@ export default function EventDetail({
           <div className="flex items-start gap-2.5 rounded-lg border border-accent/30 bg-accent/[0.08] px-3 py-2.5">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
             <p className="text-xs leading-relaxed">
-              <span className="font-semibold text-ink">Neu seit zuletzt: </span>
+              <span className="font-semibold text-ink">{t("detail.newSince")} </span>
               <span className="text-mute">{event.hold.neuSeitZuletzt.join(" · ")}</span>
             </p>
           </div>
@@ -316,7 +318,7 @@ export default function EventDetail({
                 className="mb-0.5 text-[10.5px] font-bold uppercase tracking-wider"
                 style={{ color: DANGER }}
               >
-                Verdacht auf Falschmeldung
+                {t("detail.fakeAlert")}
               </p>
             )}
             <div className="flex items-start gap-2">
@@ -326,14 +328,14 @@ export default function EventDetail({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Detail schließen"
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line text-mute hover:text-ink xl:hidden"
+                aria-label={t("detail.close")}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line text-mute hover:text-ink"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-mute">
-              <span>{fake ? "Desinformation" : event.eventType}</span>
+              <span>{fake ? t("detail.disinformation") : eventTypeLabel(event.eventType)}</span>
               <span className="text-line">·</span>
               <span>{event.ort}</span>
               <span className="text-line">·</span>
@@ -342,21 +344,22 @@ export default function EventDetail({
               </span>
               <span className="text-line">·</span>
               <span>
-                wird geprüft von: <span className="font-medium text-ink">du</span>
+                {t("detail.reviewedBy")}{" "}
+                <span className="font-medium text-ink">{t("detail.you")}</span>
               </span>
             </p>
           </div>
         </div>
 
-        {/* KI-Einschätzung: Aussage + Konfidenz-Stufe + Warum, keine Prozentwerte */}
+        {/* KI-Einschätzung: Aussage + Konfidenz-Balken + Warum */}
         <div className="rounded-lg border border-line bg-panel p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-dim">
-                KI-Einschätzung
+                {t("detail.aiAssessment")}
               </span>
               <span className="text-sm font-semibold text-ink">
-                {event.einschaetzung ?? event.eventType}
+                {event.einschaetzung ?? eventTypeLabel(event.eventType)}
               </span>
             </div>
             {fake ? (
@@ -366,7 +369,7 @@ export default function EventDetail({
                 style={{ color: DANGER, borderColor: `${DANGER}66`, backgroundColor: `${DANGER}1f` }}
               >
                 <TriangleAlert className="h-3 w-3" aria-hidden strokeWidth={2.6} />
-                Verdacht {konfidenzStufe(1 - event.confidence)}
+                {t("detail.suspicion")} {confidenceLabel(konfidenzStufe(1 - event.confidence))}
               </span>
             ) : (
               <KonfidenzPill value={event.confidence} verified={event.verifiziert} />
@@ -375,25 +378,25 @@ export default function EventDetail({
           {event.hold && trendVorher !== trendJetzt && (
             <p className="mt-2 flex items-center gap-1.5 text-xs text-mute">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-dim">
-                Trend
+                {t("detail.trend")}
               </span>
-              {trendVorher}
+              {confidenceLabel(trendVorher!)}
               <ArrowRight className="h-3 w-3" aria-hidden />
               <span className="font-semibold" style={{ color: SUCCESS }}>
-                {trendJetzt}
+                {confidenceLabel(trendJetzt)}
               </span>
-              <span className="text-dim">in {event.hold.seitMin} Min</span>
+              <span className="text-dim">{t("detail.trendIn", { min: event.hold!.seitMin })}</span>
             </p>
           )}
           {event.warum && (
             <p className="mt-2 flex gap-2 text-xs leading-relaxed text-mute">
-              <span className="shrink-0 text-dim">Warum:</span>
+              <span className="shrink-0 text-dim">{t("detail.why")}</span>
               <span>{event.warum}</span>
             </p>
           )}
         </div>
 
-        <ZoneLabel>Beurteilung</ZoneLabel>
+        <ZoneLabel>{t("detail.zoneAssessment")}</ZoneLabel>
 
         {/* Fake: Behauptung gegen Datenlage, direkt unter der Einschätzung */}
         {fake && event.verdacht && (
@@ -406,7 +409,7 @@ export default function EventDetail({
                 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-wider"
                 style={{ color: DANGER }}
               >
-                Behauptung im Umlauf
+                {t("detail.claimCirculating")}
               </p>
               <p className="text-[12.5px] italic leading-relaxed text-ink">
                 „{event.verdacht.behauptung}"
@@ -420,7 +423,7 @@ export default function EventDetail({
                 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-wider"
                 style={{ color: SUCCESS }}
               >
-                Offizielle Datenlage
+                {t("detail.officialData")}
               </p>
               <p className="text-[12.5px] leading-relaxed text-ink">{event.verdacht.datenlage}</p>
             </div>
@@ -432,10 +435,10 @@ export default function EventDetail({
           <AchsenBox
             titel={
               fake
-                ? "Was spricht dagegen?"
+                ? t("detail.axisAgainst")
                 : event.status === "hold"
-                  ? "Fehlt noch zur Eskalation"
-                  : "Glaubwürdig?"
+                  ? t("detail.axisMissing")
+                  : t("detail.axisCredible")
             }
             icon={
               fake ? (
@@ -452,7 +455,7 @@ export default function EventDetail({
                       <X
                         className="mt-0.5 h-3.5 w-3.5 shrink-0"
                         style={{ color: DANGER }}
-                        aria-label="Verdachtsgrund"
+                        aria-label={t("detail.suspicionReason")}
                         strokeWidth={2.4}
                       />
                       {g}
@@ -464,53 +467,55 @@ export default function EventDetail({
                         <Check
                           className="mt-0.5 h-3.5 w-3.5 shrink-0"
                           style={{ color: SUCCESS }}
-                          aria-label="Erfüllt"
+                          aria-label={t("detail.fulfilled")}
                           strokeWidth={2.4}
                         />
                       ) : (
                         <Clock
                           className="mt-0.5 h-3.5 w-3.5 shrink-0"
                           style={{ color: WARNING }}
-                          aria-label="Offen"
+                          aria-label={t("detail.open")}
                           strokeWidth={2.2}
                         />
                       )}
                       <span className={p.status === "erfuellt" ? "text-ink" : "text-mute"}>
                         {p.label}
-                        {p.status === "offen" && <span style={{ color: WARNING }}> · offen</span>}
+                        {p.status === "offen" && <span style={{ color: WARNING }}>{t("detail.openSuffix")}</span>}
                       </span>
                     </li>
                   ))}
               {!fake && (event.urteil?.glaubwuerdig ?? []).length === 0 && (
-                <li className="text-xs text-dim">Keine Prüfpunkte vorhanden.</li>
+                <li className="text-xs text-dim">{t("detail.noCheckpoints")}</li>
               )}
             </ul>
           </AchsenBox>
 
           <AchsenBox
-            titel="Dringend?"
+            titel={t("detail.axisUrgent")}
             icon={<TriangleAlert className="h-3.5 w-3.5 text-mute" aria-hidden />}
           >
             <div className="mb-3">
               <UrgencyMeter u={event.urgency} />
             </div>
             <div className="space-y-2.5">
-              <Feld label="Wo">
+              <Feld label={t("detail.where")}>
                 {event.urteil?.wo ?? event.ort}
                 {event.urteil?.woHinweis && (
                   <span style={{ color: SEV[4] }}> · {event.urteil.woHinweis}</span>
                 )}
               </Feld>
-              <Feld label="Wann">
-                {fake ? `seit ${minutenSeit(nowIso, event.wann)} Min im Umlauf` : vorMin}
+              <Feld label={t("detail.when")}>
+                {fake
+                  ? t("detail.circulatingSince", { min: minutenSeit(nowIso, event.wann) })
+                  : vorMin}
                 {!fake && event.urteil?.nochAktiv != null && (
                   <span style={{ color: event.urteil.nochAktiv ? SUCCESS : "#9C9C9C" }}>
                     {" "}
-                    · {event.urteil.nochAktiv ? "noch aktiv" : "keine neuen Signale"}
+                    · {event.urteil.nochAktiv ? t("detail.stillActive") : t("detail.noNewSignals")}
                   </span>
                 )}
               </Feld>
-              <Feld label="Was">{event.urteil?.was ?? event.zusammenfassung}</Feld>
+              <Feld label={t("detail.what")}>{event.urteil?.was ?? event.zusammenfassung}</Feld>
             </div>
           </AchsenBox>
         </div>
@@ -520,16 +525,18 @@ export default function EventDetail({
           <div className="rounded-lg border border-line p-3.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-dim">
-                Verbreitung
+                {t("detail.spread")}
               </span>
               <span className="flex items-baseline gap-2">
                 <span className="text-base font-bold text-ink">
-                  {event.verdacht.shares.toLocaleString("de-DE")}
+                  {event.verdacht.shares.toLocaleString(numberLocale)}
                 </span>
-                <span className="text-[11.5px] text-mute">Shares</span>
+                <span className="text-[11.5px] text-mute">{t("detail.shares")}</span>
                 <span className="text-xs font-semibold" style={{ color: DANGER }}>
-                  +{event.verdacht.sharesDelta.toLocaleString("de-DE")} in {event.verdacht.deltaMin}{" "}
-                  Min
+                  {t("detail.sharesDelta", {
+                    delta: event.verdacht.sharesDelta.toLocaleString(numberLocale),
+                    min: event.verdacht.deltaMin,
+                  })}
                 </span>
               </span>
             </div>
@@ -550,14 +557,14 @@ export default function EventDetail({
         {event.status === "hold" && (
           <div className="rounded-lg border border-line p-3.5">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-dim">
-              Quellen nach Typ
+              {t("detail.sourcesByType")}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {(
                 [
-                  ["Social", stat.social],
-                  ["Wetter und Pegel", stat.wetter],
-                  ["Amtlich", stat.amtlich],
+                  [t("detail.sourceSocial"), stat.social],
+                  [t("detail.sourceWeather"), stat.wetter],
+                  [t("detail.sourceOfficial"), stat.amtlich],
                 ] as const
               ).map(([label, n]) =>
                 n > 0 ? (
@@ -580,14 +587,14 @@ export default function EventDetail({
           </div>
         )}
 
-        <ZoneLabel>Belege</ZoneLabel>
+        <ZoneLabel>{t("detail.zoneEvidence")}</ZoneLabel>
 
         {/* Originalbeleg: Wortlaut + Quelle */}
         {erstPost && (
           <div className="rounded-lg border border-line p-3.5">
             <div className="mb-1.5 flex items-center justify-between">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-dim">
-                Originalbeleg
+                {t("detail.originalEvidence")}
               </span>
               {erstPost.url && (
                 <a
@@ -596,7 +603,7 @@ export default function EventDetail({
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
                 >
-                  Zur Quelle <ExternalLink className="h-3 w-3" aria-hidden />
+                  {t("detail.toSource")} <ExternalLink className="h-3 w-3" aria-hidden />
                 </a>
               )}
             </div>
@@ -615,9 +622,10 @@ export default function EventDetail({
             className="flex w-full items-center justify-between px-3.5 py-3 text-left"
           >
             <span className="text-xs font-semibold text-ink">
-              Belege im Detail{" "}
+              {t("detail.evidenceDetail")}{" "}
               <span className="font-normal text-dim">
-                · {stat.gesamt} {stat.gesamt === 1 ? "Signal" : "Signale"}
+                · {stat.gesamt}{" "}
+                {stat.gesamt === 1 ? t("detail.signal") : t("detail.signals")}
               </span>
             </span>
             <ChevronDown

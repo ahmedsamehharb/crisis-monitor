@@ -67,6 +67,19 @@ export function konfidenzFarbe(v: number): string {
   return STUFE_FARBE[konfidenzStufe(v)];
 }
 
+/** 0–100 für Anzeige */
+export function confidencePercent(value: number): number {
+  return Math.round(Math.max(0, Math.min(1, value)) * 100);
+}
+
+/** Balkenfarbe: rot &lt;33%, gelb 33–66%, grün ≥66% */
+export function confidenceBarColor(value: number): string {
+  const v = Math.max(0, Math.min(1, value));
+  if (v < 0.33) return "#E5484D";
+  if (v < 0.66) return "#E7B53C";
+  return "#3FB36B";
+}
+
 /* ── On-Hold: Trend und Highlight (nur Hervorhebung, die KI löst keine Aktion aus) ── */
 
 /** Hervorheben ab dieser Konfidenz ... */
@@ -87,12 +100,14 @@ export function trendRichtung(ev: CwEvent): TrendRichtung {
 }
 
 /** Grund der Hervorhebung einer On-Hold-Zeile, oder null wenn ruhig */
-export function holdHinweis(ev: CwEvent): string | null {
+export type HoldHintKey = "threshold" | "surge";
+
+export function holdHintKey(ev: CwEvent): HoldHintKey | null {
   if (!ev.hold) return null;
-  if (ev.confidence >= HOLD_SCHWELLE) return "Schwelle erreicht";
+  if (ev.confidence >= HOLD_SCHWELLE) return "threshold";
   const anstieg = ev.confidence - ev.hold.konfidenzVorher;
   if (anstieg >= HOLD_ANSTIEG && ev.hold.seitMin <= HOLD_ANSTIEG_FENSTER_MIN) {
-    return "Starker Anstieg";
+    return "surge";
   }
   return null;
 }

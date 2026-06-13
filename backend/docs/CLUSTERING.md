@@ -212,9 +212,22 @@ Used when matching by distance (Haversine). Municipality match bypasses strict d
 
 ### Trust rollup
 
+Event `credibilityScore` (0–1) is recomputed whenever signals merge:
+
+```
+credibilityScore = min(1,
+  average(signal trust)
+  + (sourceCategories − 1) × CLUSTER_TRUST_BOOST_PER_CATEGORY
+  + (signalCount − 1) × CLUSTER_TRUST_BOOST_PER_SIGNAL
+)
+```
+
+More merged signals raise confidence even when individual posts have low base trust (e.g. social).
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `CLUSTER_TRUST_BOOST_PER_CATEGORY` | `0.08` | Added trust per extra source category (official / sensor / social) |
+| `CLUSTER_TRUST_BOOST_PER_SIGNAL` | `0.05` | Added trust per additional merged signal on the same event |
 
 ### Performance
 

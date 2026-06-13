@@ -1,24 +1,21 @@
+"use client";
+
 import type { ReactNode } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
-  Check,
-  Minus,
   ShieldCheck,
-  TriangleAlert,
 } from "lucide-react";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import type { Urgency } from "@/lib/types";
 import {
   SEV,
-  STUFE_FARBE,
-  URGENCY_LABEL,
-  konfidenzStufe,
-  type AnzeigeStufe,
+  confidenceBarColor,
+  confidencePercent,
   type TrendRichtung,
 } from "@/lib/ui";
 
-/** Ungelesene neue Signale — dezenter Akzent-Punkt wie Chat-Badge, passend zum Dark-UI */
 export function UnreadDot({
   count = 1,
   className = "",
@@ -26,13 +23,15 @@ export function UnreadDot({
   count?: number;
   className?: string;
 }) {
+  const { plural } = useI18n();
   if (count <= 0) return null;
   const showCount = count > 1;
+  const label = plural("unread", count);
   return (
     <span
       className={`cw-unread-dot shrink-0 ${showCount ? "cw-unread-dot-count" : ""} ${className}`}
-      aria-label={`${count} neue Signal${count === 1 ? "" : "e"}`}
-      title={`${count} neue Signal${count === 1 ? "" : "e"}`}
+      aria-label={label}
+      title={label}
     >
       {showCount ? (
         <span className="text-[9px] font-bold leading-none text-[#161616]">
@@ -84,69 +83,77 @@ export function Pill({
   );
 }
 
-const STUFE_ICON: Record<AnzeigeStufe, typeof Check> = {
-  niedrig: TriangleAlert,
-  mittel: Minus,
-  hoch: Check,
-  verifiziert: ShieldCheck,
-};
-
-/**
- * Konfidenz als Stufen-Pill, Icon + Text statt Prozentwert. "verifiziert" ist
- * ein eigener Status über dem Score: solides Badge, Label "Verifiziert" ohne
- * Konfidenz-Präfix, damit es nicht als bloßer Höchst-Score gelesen wird.
- */
-export function KonfidenzPill({
+function KonfidenzBar({
   value,
   verified = false,
-  prefix = "Konfidenz",
+  size = "compact",
 }: {
   value: number;
   verified?: boolean;
-  prefix?: string;
+  size?: "compact" | "full";
 }) {
-  const stufe: AnzeigeStufe = verified ? "verifiziert" : konfidenzStufe(value);
-  const c = STUFE_FARBE[stufe];
-  const Icon = STUFE_ICON[stufe];
-  if (stufe === "verifiziert") {
+  const { t } = useI18n();
+  const pct = confidencePercent(value);
+  const fill = confidenceBarColor(value);
+
+  if (size === "compact") {
     return (
       <span
-        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-semibold"
-        style={{ color: "#141414", backgroundColor: c }}
+        className="inline-flex w-[54px] flex-col items-end gap-0.5"
+        aria-label={t("confidence.aria", { level: `${pct}%` })}
       >
-        <Icon className="h-3 w-3" aria-hidden strokeWidth={2.6} />
-        Verifiziert
+        <span className="flex items-center gap-0.5 text-[11px] font-bold tabular-nums leading-none text-ink">
+          {verified && <ShieldCheck className="h-3 w-3 shrink-0 text-[#3FB36B]" aria-hidden strokeWidth={2.4} />}
+          {pct}%
+        </span>
+        <span className="h-1 w-full overflow-hidden rounded-full bg-line/90" aria-hidden>
+          <span
+            className="block h-full rounded-full transition-[width] duration-300"
+            style={{ width: `${pct}%`, backgroundColor: fill }}
+          />
+        </span>
       </span>
     );
   }
+
   return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11.5px] font-semibold"
-      style={{ color: c, borderColor: `${c}66`, backgroundColor: `${c}1f` }}
+    <div
+      className="flex min-w-[76px] flex-col gap-1"
+      aria-label={t("confidence.aria", { level: `${pct}%` })}
     >
-      <Icon className="h-3 w-3" aria-hidden strokeWidth={2.6} />
-      {prefix} {stufe}
-    </span>
+      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-dim">
+        {t("confidence.prefix")}
+      </span>
+      <span className="flex items-center gap-1 text-[15px] font-bold tabular-nums leading-none text-ink">
+        {verified && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#3FB36B]" aria-hidden strokeWidth={2.4} />}
+        {pct}%
+      </span>
+      <span className="h-1.5 w-full min-w-[76px] overflow-hidden rounded-full bg-line/90" aria-hidden>
+        <span
+          className="block h-full rounded-full transition-[width] duration-300"
+          style={{ width: `${pct}%`, backgroundColor: fill }}
+        />
+      </span>
+    </div>
   );
 }
 
-/** Konfidenz-Stufe als kompakter Text für Listenzeilen (vier-stufig) */
+export function KonfidenzPill({
+  value,
+  verified = false,
+}: {
+  value: number;
+  verified?: boolean;
+}) {
+  return <KonfidenzBar value={value} verified={verified} size="full" />;
+}
+
 export function KonfidenzText({ value, verified = false }: { value: number; verified?: boolean }) {
-  const stufe: AnzeigeStufe = verified ? "verifiziert" : konfidenzStufe(value);
-  return (
-    <span
-      className="inline-flex items-center gap-1 text-xs font-semibold"
-      style={{ color: STUFE_FARBE[stufe] }}
-      aria-label={`Konfidenz ${stufe}`}
-    >
-      {verified && <ShieldCheck className="h-3 w-3" aria-hidden strokeWidth={2.4} />}
-      {stufe}
-    </span>
-  );
+  return <KonfidenzBar value={value} verified={verified} size="compact" />;
 }
 
-/** Trend-Pfeil für On-Hold-Zeilen: Richtung als Form, Farbe nur bei steigend */
 export function TrendPfeil({ richtung, danger = false }: { richtung: TrendRichtung; danger?: boolean }) {
+  const { t, trendLabel } = useI18n();
   const Icon =
     richtung === "steigend" ? ArrowUpRight : richtung === "fallend" ? ArrowDownRight : ArrowRight;
   const color = danger ? "#E5484D" : richtung === "steigend" ? "#3FB36B" : "#9C9C9C";
@@ -155,13 +162,14 @@ export function TrendPfeil({ richtung, danger = false }: { richtung: TrendRichtu
       className="h-3.5 w-3.5 shrink-0"
       style={{ color }}
       strokeWidth={2.4}
-      aria-label={`Trend ${richtung}`}
+      aria-label={t("trend.aria", { dir: trendLabel(richtung) })}
     />
   );
 }
 
-/** Urgency als Segment-Meter: Magnitude ohne Lesen erfassbar, Stufen-Label darunter */
 export function UrgencyMeter({ u }: { u: Urgency }) {
+  const { t, urgencyLabel } = useI18n();
+  const label = urgencyLabel(u);
   return (
     <div>
       <div
@@ -170,7 +178,7 @@ export function UrgencyMeter({ u }: { u: Urgency }) {
         aria-valuemin={1}
         aria-valuemax={5}
         aria-valuenow={u}
-        aria-label={`Dringlichkeit ${u} von 5`}
+        aria-label={t("urgency.meter", { level: u })}
       >
         {([1, 2, 3, 4, 5] as Urgency[]).map((i) => (
           <div
@@ -181,7 +189,7 @@ export function UrgencyMeter({ u }: { u: Urgency }) {
         ))}
       </div>
       <p className="mt-1.5 text-[11.5px] font-semibold" style={{ color: SEV[u] }}>
-        Stufe {u} von 5 · {URGENCY_LABEL[u]}
+        {t("urgency.level", { level: u, label })}
       </p>
     </div>
   );

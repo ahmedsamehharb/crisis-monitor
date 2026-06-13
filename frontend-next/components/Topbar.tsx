@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, ChevronDown, MapPin, Shield } from "lucide-react";
+import { useI18n, type Locale } from "@/lib/i18n/I18nProvider";
 
 interface Props {
   gemeinden: string[];
@@ -18,16 +19,39 @@ function Zahl({ n, label }: { n: number; label: string }) {
   );
 }
 
+function LangButton({
+  code,
+  active,
+  onClick,
+}: {
+  code: Locale;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide transition-colors ${
+        active ? "bg-accent/20 text-accent" : "text-mute hover:text-ink"
+      }`}
+    >
+      {code}
+    </button>
+  );
+}
+
 export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Props) {
+  const { locale, setLocale, t, numberLocale } = useI18n();
   const [open, setOpen] = useState(false);
   const [uhrzeit, setUhrzeit] = useState<string | null>(null);
   const optionen = ["alle", ...gemeinden];
 
-  // Uhr erst nach dem Mount ticken lassen (Hydration)
   useEffect(() => {
     const tick = () =>
       setUhrzeit(
-        new Date().toLocaleTimeString("de-DE", {
+        new Date().toLocaleTimeString(numberLocale, {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
@@ -36,22 +60,29 @@ export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Pro
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [numberLocale]);
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-panel px-4">
       <div className="flex shrink-0 items-center gap-2.5">
         <Shield className="h-4 w-4 text-mute" aria-hidden />
-        <span className="text-sm font-semibold tracking-wide">Codewehr</span>
-        <span className="hidden text-[11px] font-medium text-dim md:inline">
-          Verifikations-Cockpit
-        </span>
+        <span className="text-sm font-semibold tracking-wide">VERA</span>
+        <span className="hidden text-[11px] font-medium text-dim md:inline">{t("topbar.subtitle")}</span>
       </div>
 
       <div className="flex items-center gap-4 lg:gap-5">
-        <span className="hidden text-sm font-semibold sm:inline" aria-label="Uhrzeit">
+        <span className="hidden text-sm font-semibold sm:inline" aria-label={t("topbar.time")}>
           {uhrzeit ?? "--:--:--"}
         </span>
+
+        <div
+          className="flex items-center gap-0.5 rounded-md border border-line bg-bg p-0.5"
+          role="group"
+          aria-label={t("locale.label")}
+        >
+          <LangButton code="de" active={locale === "de"} onClick={() => setLocale("de")} />
+          <LangButton code="en" active={locale === "en"} onClick={() => setLocale("en")} />
+        </div>
 
         <div className="relative">
           <button
@@ -59,27 +90,27 @@ export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Pro
             onClick={() => setOpen((o) => !o)}
             aria-haspopup="listbox"
             aria-expanded={open}
-            aria-label="Standort wählen"
+            aria-label={t("topbar.locationChoose")}
             className={`flex h-8 items-center gap-1.5 rounded-md border bg-bg px-2.5 text-xs font-medium ${
               gemeinde !== "alle" ? "border-accent/50 text-accent" : "border-line text-ink"
             }`}
           >
             <MapPin className="h-3.5 w-3.5 text-mute" aria-hidden />
-            {gemeinde === "alle" ? "Alle Gemeinden" : gemeinde}
+            {gemeinde === "alle" ? t("topbar.allMunicipalities") : gemeinde}
             <ChevronDown className="h-3.5 w-3.5 text-mute" aria-hidden />
           </button>
           {open && (
             <>
               <button
                 type="button"
-                aria-label="Auswahl schließen"
+                aria-label={t("topbar.locationClose")}
                 className="fixed inset-0 z-40 cursor-default"
                 onClick={() => setOpen(false)}
                 tabIndex={-1}
               />
               <ul
                 role="listbox"
-                aria-label="Gemeinde wählen"
+                aria-label={t("topbar.locationList")}
                 className="absolute left-0 top-10 z-50 w-52 overflow-hidden rounded-lg border border-line bg-card p-1 shadow-xl shadow-black/40"
               >
                 {optionen.map((g) => (
@@ -96,7 +127,7 @@ export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Pro
                         gemeinde === g ? "bg-accent/15 text-accent" : "text-ink hover:bg-white/[0.06]"
                       }`}
                     >
-                      {g === "alle" ? "Alle Gemeinden" : g}
+                      {g === "alle" ? t("topbar.allMunicipalities") : g}
                     </button>
                   </li>
                 ))}
@@ -105,19 +136,19 @@ export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Pro
           )}
         </div>
 
-        <p className="hidden items-center gap-2 text-xs lg:flex" aria-label="Lagezähler">
-          <Zahl n={zaehler.offen} label="offen" />
+        <p className="hidden items-center gap-2 text-xs lg:flex" aria-label={t("topbar.counters")}>
+          <Zahl n={zaehler.offen} label={t("topbar.open")} />
           <span className="text-line">·</span>
-          <Zahl n={zaehler.hold} label="on hold" />
+          <Zahl n={zaehler.hold} label={t("topbar.onHold")} />
           <span className="text-line">·</span>
-          <Zahl n={zaehler.bewertet} label="bewertet" />
+          <Zahl n={zaehler.bewertet} label={t("topbar.rated")} />
         </p>
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
         <button
           type="button"
-          aria-label="Benachrichtigungen"
+          aria-label={t("topbar.notifications")}
           className="relative grid h-8 w-8 place-items-center rounded-md border border-line text-mute hover:text-ink"
         >
           <Bell className="h-4 w-4" />
@@ -132,7 +163,7 @@ export default function Topbar({ gemeinden, gemeinde, onGemeinde, zaehler }: Pro
           </span>
           <div className="hidden lg:block">
             <p className="text-xs font-semibold leading-tight">S. Lindner</p>
-            <p className="text-[10px] text-mute">Rolle S2</p>
+            <p className="text-[10px] text-mute">{t("topbar.role")}</p>
           </div>
         </div>
       </div>
